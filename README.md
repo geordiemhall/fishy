@@ -3,7 +3,7 @@ fishy
 
 A fish tank simulation/game, written as part of my AI Distinction project.
 
-
+![Fishy](img/fishy.jpg)
 
 ## AI Concepts Used
 
@@ -37,3 +37,6 @@ As the hunters kills fish, there will be more food for the parents (causing fewe
 The cycle will repeat itself: small fish all grow fairly evenly, become parents, then their food will be taken by their children (who are now growing). The parents turn into hunters and kill their children, leaving more food for the surviving fish, who grow and spawn more. Hunters eventually die, but are replaced by new parents, whose children have starved them.
 
 The player might be able to click to drop food in the tank, or perhaps draw a path for the hunters to follow (if we need to demonstrate more path planning stuff).
+
+
+![Tank](img/tank.jpg)
