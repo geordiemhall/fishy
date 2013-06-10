@@ -12,20 +12,9 @@ from random import random, randrange, uniform
 
 from path import Path
 
-AGENT_MODES = {
-    KEY._1: 'seek',
-    KEY._2: 'arrive_slow',
-    KEY._3: 'arrive_normal',
-    KEY._4: 'arrive_fast',
-    KEY._5: 'flee',
-    KEY._6: 'pursuit',
-    KEY._7: 'follow_path',
-    KEY._8: 'wander',
-    KEY.W: 'wander',
-    KEY.F: 'follow_path'
-}
 
-class Agent(object):
+
+class Fish(object):
 
     DECELERATION_SPEEDS = { 
         ### ADD 'normal' and 'fast' speeds here
@@ -35,6 +24,9 @@ class Agent(object):
     } 
 
     def __init__(self, world=None, scale=30.0, mass=0.5, mode='wander'):
+
+        print 'Fish init'
+
         # keep a reference to the world object
         self.world = world
         self.mode = mode
@@ -42,7 +34,7 @@ class Agent(object):
         self.path = world.path
         # where am i and where am i going? random
         dir = radians(random()*360)
-        self.pos = Vector2D(randrange(world.cx),randrange(world.cy))
+        self.pos = Vector2D(randrange(world.width),randrange(world.height))
         self.vel = Vector2D()
         self.heading = Vector2D(sin(dir),cos(dir))
         self.side = self.heading.perp()
@@ -113,7 +105,8 @@ class Agent(object):
 
     def calculate(self, delta):
 
-        self.force = self.flock(delta)
+        # self.force = self.flock(delta)
+        self.force = self.wander(delta)
 
         return self.force
 
@@ -151,7 +144,7 @@ class Agent(object):
         ''' Draw the triangle agent with color'''
         egi.set_pen_color(name=self.color)
 
-        if(self.world.drawDebug):
+        if(self.world.debug.drawDebug):
             if(self.isNeighbour): 
                 egi.set_pen_color(name='BLUE')
             elif(self.chosenOne): 
@@ -161,7 +154,7 @@ class Agent(object):
         # draw it!
         egi.closed_shape(pts)
 
-        if not self.world.drawDebug or not self.chosenOne:
+        if not self.world.debug.drawDebug or not self.chosenOne:
             return
 
             

@@ -4,90 +4,52 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 
 '''
 
-from vector2d import Vector2D
+from vector2d import Vector2D, Rect
 from matrix33 import Matrix33
 from graphics import egi, KEY
 
-from agent import Agent
-
+from fish import Fish
+from util import DictWrap
 from path import Path
+from guppy import Guppy
+from tank import Tank
 
 class World(object):
-    def __init__(self, cx, cy):
-        self.cx = cx
-        self.cy = cy
-        self.target = Vector2D(cx / 2, cy / 2)
+
+    ''' 
+    
+    Inits 
+    =================================='''
+
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+        
+        
+        self.scale = 10
+        self.path = Path(maxx=width, maxy=height, num_pts=5)
+        
+
+        self.makeTank()
+        print 'before make fish'
+        self.makeFish()
+        print 'after make fish'
+        self.makeDebug()
+
+
+
+    def makeFish(self):
+        self.target = Vector2D(self.width / 2, self.height / 2)
         self.hunter = None
         self.agents = []
-        self.paused = True
-        self.showInfo = True
-        self.scale = 10
-        self.path = Path(maxx=cx, maxy=cy, num_pts=5)
-        self.drawDebug = True
-        self.drawComponentForces = False
 
-        self.otherInfo = [
-            'I = Toggle info (reduces lag)',
-            'U = Toggle debug drawings',
-            'Y = Toggle draw component forces',
-            'P = Pause',
-            'A = Add agent'
-        ]
+    
 
+    def makeTank(self):
 
-        self.params = [
-            {
-                'name': 'wander_dist',
-                'keys': ('N', 'M'),
-                'value': 2.4 * self.scale,
-                'increment': 0.1
-            },
-            {
-                'name': 'wander_radius',
-                'keys': ('V', 'B'),
-                'value': 0.8 * self.scale,
-                'increment': 0.1
-            },
-            {
-                'name': 'wander_jitter',
-                'keys': ('X', 'C'),
-                'value': 8.5 * self.scale,
-                'increment': 0.1
-            },
-            {
-                'name': 'wanderInfluence',
-                'keys': ('F', 'G'),
-                'value': 13.0,
-                'increment': 0.1
-            },
-            {
-                'name': 'neighbourDistance',
-                'keys': ('W', 'E'),
-                'value': 13.0 * self.scale,
-                'increment': 0.1
-            },
-            {
-                'name': 'alignmentInfluence',
-                'keys': ('K', 'L'),
-                'value': 5,
-                'increment': 0.1
-            },
-            {
-                'name': 'separationInfluence',
-                'keys': ('H', 'J'),
-                'value': 400.0,
-                'increment': 0.1
-            },
-            {
-                'name': 'cohesionInfluence',
-                'keys': ('S', 'D'),
-                'value': 3.4,
-                'increment': 0.1
-            }
-        ]
-
-        self.generateInfo()
-
+        self.tank = Tank(world=self)
+        print 'after make tank'
 
     def syncParams(self):
         for param in self.params:
@@ -148,6 +110,33 @@ class World(object):
         for p in self.info:
             print p[1], p[2]
 
+
+
+
+    def resize(self, width, height):
+        self.width = width
+        self.height = height
+
+        self.tank.resize()
+
+
+
+
+    ''' 
+    
+    Rendering 
+    =================================='''
+
+    def render(self):
+        for agent in self.agents:
+            agent.render()
+
+        if self.debug.showInfo:
+            self.drawInfo()
+
+        self.tank.render()
+
+
     def drawInfo(self):
 
 
@@ -159,7 +148,7 @@ class World(object):
         egi.text_color(name='WHITE')
         
 
-        for i, inf in enumerate(self.otherInfo):
+        for i, inf in enumerate(self.debug.otherInfo):
             egi.text_at_pos(offset[0], offset[1] + i * lineHeight, inf)
             
         
@@ -168,34 +157,40 @@ class World(object):
         i = 0
         for p in self.info:
             egi.text_color(name='GREY')
-            egi.text_at_pos(offset[0] + 0, self.cy - (offset[1] + i * lineHeight), p[0])
+            egi.text_at_pos(offset[0] + 0, self.height - (offset[1] + i * lineHeight), p[0])
             egi.text_color(name='WHITE')
-            egi.text_at_pos(offset[0] + 50, self.cy - (offset[1] + i * lineHeight), p[1])
+            egi.text_at_pos(offset[0] + 50, self.height - (offset[1] + i * lineHeight), p[1])
             egi.text_color(name='ORANGE')
-            egi.text_at_pos(offset[0] + 200, self.cy - (offset[1] + i * lineHeight), p[2])
+            egi.text_at_pos(offset[0] + 200, self.height - (offset[1] + i * lineHeight), p[2])
             i += 1
 
 
 
 
+
+
+
+
+
+
+    ''' 
+    
+    World logic 
+    =================================='''
+
     def add_agent(self, num=1):
         for _ in xrange(num):
-            newAgent = Agent(world=self, scale=10)
+            newAgent = Guppy(world=self, scale=10)
             self.agents.append(newAgent)
 
 
     def randomize_path(self):
-        self.path.create_random_path(8, self.cx/6, self.cy/6, self.cx*2/3 + self.cx/6, self.cy*2/3 + self.cy/6)
+        self.path.create_random_path(8, self.width/6, self.height/6, self.width*2/3 + self.width/6, self.height*2/3 + self.height/6)
         for agent in self.agents:
                 agent.path = self.path
 
 
-    def render(self):
-        for agent in self.agents:
-            agent.render()
-
-        if self.showInfo:
-            self.drawInfo()
+    
 
 
     def getNeighbours(self, agent, distance=100):
@@ -214,9 +209,24 @@ class World(object):
         return arr
 
 
+
+
+
+
+
+
+
+
+     
+    ''' 
+
+    Util 
+    =================================='''
+    
+
     def wrap_around(self, pos):
         ''' Treat world as a toroidal space. Updates parameter object pos '''
-        max_x, max_y = self.cx, self.cy
+        max_x, max_y = self.width, self.height
         if pos.x > max_x:
             pos.x = pos.x - max_x
         elif pos.x < 0:
@@ -261,3 +271,88 @@ class World(object):
         mat.transform_vector2d(wld_pt)
         # done
         return wld_pt
+
+
+
+
+
+
+
+
+
+    ''' 
+    
+    Debug code 
+    =================================='''
+
+    def makeDebug(self):
+        
+        
+
+        self.paused = True
+
+        self.debug = DictWrap({
+            'showInfo': False,
+            'drawDebug': True,
+            'drawComponentForces': False,
+            'otherInfo': [
+                'I = Toggle info (reduces lag)',
+                'U = Toggle debug drawings',
+                'Y = Toggle draw component forces',
+                'P = Pause',
+                'A = Add agent'
+            ]
+        })
+
+        self.params = [
+            {
+                'name': 'wander_dist',
+                'keys': ('N', 'M'),
+                'value': 2.4 * self.scale,
+                'increment': 0.1
+            },
+            {
+                'name': 'wander_radius',
+                'keys': ('V', 'B'),
+                'value': 0.8 * self.scale,
+                'increment': 0.1
+            },
+            {
+                'name': 'wander_jitter',
+                'keys': ('X', 'C'),
+                'value': 8.5 * self.scale,
+                'increment': 0.1
+            },
+            {
+                'name': 'wanderInfluence',
+                'keys': ('F', 'G'),
+                'value': 13.0,
+                'increment': 0.1
+            },
+            {
+                'name': 'neighbourDistance',
+                'keys': ('W', 'E'),
+                'value': 13.0 * self.scale,
+                'increment': 0.1
+            },
+            {
+                'name': 'alignmentInfluence',
+                'keys': ('K', 'L'),
+                'value': 5,
+                'increment': 0.1
+            },
+            {
+                'name': 'separationInfluence',
+                'keys': ('H', 'J'),
+                'value': 400.0,
+                'increment': 0.1
+            },
+            {
+                'name': 'cohesionInfluence',
+                'keys': ('S', 'D'),
+                'value': 3.4,
+                'increment': 0.1
+            }
+        ]
+
+        self.generateInfo()

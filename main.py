@@ -34,7 +34,7 @@ from pyglet.gl import *
 
 from vector2d import Vector2D
 from world import World
-from agent import Agent, AGENT_MODES # Agent with seek, arrive, flee and pursuit
+from fish import Fish
 
 
 
@@ -58,32 +58,24 @@ def on_key_press(symbol, modifiers):
         world.syncParams()
 
     elif symbol == KEY.I:
-        world.showInfo = not world.showInfo
+        world.debug.showInfo = not world.debug.showInfo
 
     elif symbol == KEY.U:
-        world.drawDebug = not world.drawDebug
+        world.debug.drawDebug = not world.debug.drawDebug
 
     elif symbol == KEY.Y:
-        world.drawComponentForces = not world.drawComponentForces
+        world.debug.drawComponentForces = not world.debug.drawComponentForces
 
     else:
         world.keyPressed(symbol, modifiers)
 
-    # elif symbol == KEY.U:
-    #     for agent in world.agents:
-    #         agent.max_wander_speed += 50
-    #     print("max_wander_speed is now", world.agents[0].max_wander_speed)
-
-    # elif symbol == KEY.J:
-    #     for agent in world.agents:
-    #         agent.max_wander_speed -= 50
-    #     print("max_wander_speed is now", world.agents[0].max_wander_speed)
 
 
 
-def on_resize(cx, cy):
-    world.cx = cx
-    world.cy = cy
+
+def on_resize(width, height):
+    
+    world.resize(width, height)
 
 
 

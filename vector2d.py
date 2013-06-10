@@ -5,6 +5,7 @@ Updated by Steve Dower
 '''
 
 from math import sqrt, cos
+from util import DictWrap
 from point2d import Point2D
 
 MIN_FLOAT = 1e-300
@@ -18,6 +19,20 @@ def is_equal(a, b):
 #
 #def Vector2DToPoint(v):
 #    return Point2D(v.x, v.y)
+
+class Rect(object):
+    def __init__(self, rect=DictWrap({'left': 0, 'bottom': 0, 'top': 10, 'right': 10})):
+        self.left = rect.left
+        self.top = rect.top
+        self.right = rect.right
+        self.bottom = rect.bottom
+
+    def getBox(self):
+        return (self.left, self.top, self.right, self.bottom)
+
+
+
+
 
 
 class Vector2D(object):
