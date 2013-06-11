@@ -23,7 +23,7 @@ class Fish(object):
         'fast': 0.5
     } 
 
-    def __init__(self, world=None, scale=30.0, mass=0.5, mode='wander'):
+    def __init__(self, world=None, scale=30.0, mass=1.0, mode='wander'):
 
         print 'Fish init'
 
@@ -39,6 +39,7 @@ class Fish(object):
         self.heading = Vector2D(sin(dir),cos(dir))
         self.side = self.heading.perp()
         self.scale = Vector2D(scale,scale) # easy scaling of agent size
+        self.scaleValue = scale
         self.force = Vector2D() # current steering force
         self.mass = mass
 
@@ -89,7 +90,7 @@ class Fish(object):
         separation = self.separationForce()
         cohesion = self.cohesionForce()
 
-        if(self.chosenOne and self.world.drawComponentForces):
+        if(self.chosenOne and self.world.debug.drawComponentForces):
             s = 0.1
             egi.green_pen()
             egi.line_with_arrow(self.pos, self.pos + alignment * s, 10)
@@ -108,7 +109,7 @@ class Fish(object):
         # self.force = self.flock(delta)
         self.force = self.wander(delta)
 
-        return self.force
+        return self.force / self.mass
 
 
     def update(self, delta):

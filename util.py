@@ -1,6 +1,8 @@
 # Util
 # ==================================
 
+import copy
+
 class DictWrap(object):
     """ Wrap an existing dict, or create a new one, and access with either dot 
         notation or key lookup.
@@ -87,13 +89,25 @@ class Util(object):
 
 
     @staticmethod
-    def scalePoints(points, x = 1, y = 1):
+    def scalePoints(points, x = 1.0, y = 1.0):
 
         for point in points:
             point.x *= x
             point.y *= y
 
         return points
+
+
+    @staticmethod
+    def scaledPoints(points, x = 1.0, y = 1.0):
+
+        pointsCopy = copy.deepcopy(points)
+
+        for point in pointsCopy:
+            point.x *= x
+            point.y *= y
+
+        return pointsCopy
 
 
 
