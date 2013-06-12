@@ -24,11 +24,12 @@ class World(object):
     def __init__(self, width, height):
         self.width = width
         self.height = height
+        self.center = Vector2D(width/2, height/2)
 
         
         
         self.scale = 10
-        self.path = Path(maxx=width, maxy=height, num_pts=5)
+        # self.path = Path(maxx=width, maxy=height, num_pts=5)
         
 
         self.makeTank()
@@ -37,54 +38,24 @@ class World(object):
         print 'after make fish'
         self.makeDebug()
 
+        self.makeFood()
 
 
-    def makeFish(self):
-        self.target = Vector2D(self.width / 2, self.height / 2)
-        self.hunter = None
+
+    def makeFish(self):        
         self.agents = []
 
     
+    def makeFood(self):
+        self.food = []
+
 
     def makeTank(self):
 
         self.tank = Tank(world=self)
         print 'after make tank'
 
-    def syncParams(self):
-        for param in self.params:
-            self.updateAgentParam(param['name'], param['value'])
-
-
-
-
-    def keyPressed(self, symbol, modifiers):
-        # Checks if any parameters' keys were pressed
-        
-        for param in self.params:
-            keys = param['keys']
-            codes = (getattr(KEY, keys[0]), getattr(KEY, keys[1]))
-            
-
-            # If we were pressed, then change the value
-            # Only update the parameter that was changed
-            # Might need to optimise this further
-
-            if(symbol == codes[0]):
-                param['value'] *= (1 - param['increment'])
-                self.updateAgentParam(param['name'], param['value'])
-            elif(symbol == codes[1]):
-                param['value'] *= (1 + param['increment'])
-                self.updateAgentParam(param['name'], param['value'])
-            
-
-
-    # Might be easier to just make agents look this up from the world...
-    def updateAgentParam(self, param, value):
-        print 'Update parameter:', param, '=>', value
-        self.generateInfo()
-        for agent in self.agents:
-            agent.__setattr__(param, value)
+    
 
 
     def update(self, delta):
@@ -116,6 +87,7 @@ class World(object):
     def resize(self, width, height):
         self.width = width
         self.height = height
+        self.center = Vector2D(width/2, height/2)
 
         self.tank.resize()
 
@@ -305,12 +277,12 @@ class World(object):
         })
 
         self.params = [
-            {
-                'name': 'wander_dist',
-                'keys': ('N', 'M'),
-                'value': 2.4 * self.scale,
-                'increment': 0.1
-            },
+            # {
+            #     'name': 'wanderDistance',
+            #     'keys': ('N', 'M'),
+            #     'value': 2.4 * self.scale,
+            #     'increment': 0.1
+            # },
             {
                 'name': 'wander_radius',
                 'keys': ('V', 'B'),
@@ -323,18 +295,18 @@ class World(object):
                 'value': 8.5 * self.scale,
                 'increment': 0.1
             },
-            {
-                'name': 'wanderInfluence',
-                'keys': ('F', 'G'),
-                'value': 13.0,
-                'increment': 0.1
-            },
-            {
-                'name': 'neighbourDistance',
-                'keys': ('W', 'E'),
-                'value': 13.0 * self.scale,
-                'increment': 0.1
-            },
+            # {
+            #     'name': 'wanderInfluence',
+            #     'keys': ('F', 'G'),
+            #     'value': 13.0,
+            #     'increment': 0.1
+            # },
+            # {
+            #     'name': 'neighbourDistance',
+            #     'keys': ('W', 'E'),
+            #     'value': 13.0 * self.scale,
+            #     'increment': 0.1
+            # },
             {
                 'name': 'alignmentInfluence',
                 'keys': ('K', 'L'),
@@ -356,3 +328,38 @@ class World(object):
         ]
 
         self.generateInfo()
+
+    def syncParams(self):
+        for param in self.params:
+            self.updateAgentParam(param['name'], param['value'])
+
+
+
+
+    def keyPressed(self, symbol, modifiers):
+        # Checks if any parameters' keys were pressed
+        
+        for param in self.params:
+            keys = param['keys']
+            codes = (getattr(KEY, keys[0]), getattr(KEY, keys[1]))
+            
+
+            # If we were pressed, then change the value
+            # Only update the parameter that was changed
+            # Might need to optimise this further
+
+            if(symbol == codes[0]):
+                param['value'] *= (1 - param['increment'])
+                self.updateAgentParam(param['name'], param['value'])
+            elif(symbol == codes[1]):
+                param['value'] *= (1 + param['increment'])
+                self.updateAgentParam(param['name'], param['value'])
+            
+
+
+    # Might be easier to just make agents look this up from the world...
+    def updateAgentParam(self, param, value):
+        print 'Update parameter:', param, '=>', value
+        self.generateInfo()
+        for agent in self.agents:
+            agent.__setattr__(param, value)

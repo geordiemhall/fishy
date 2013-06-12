@@ -34,7 +34,7 @@ from pyglet.gl import *
 
 from vector2d import Vector2D
 from world import World
-from fish import Fish
+
 
 
 
@@ -55,7 +55,7 @@ def on_key_press(symbol, modifiers):
     elif symbol == KEY.A:
         # Add an another agent when A is pressed
         world.add_agent()
-        world.syncParams()
+        # world.syncParams()
 
     elif symbol == KEY.I:
         world.debug.showInfo = not world.debug.showInfo
@@ -65,6 +65,15 @@ def on_key_press(symbol, modifiers):
 
     elif symbol == KEY.Y:
         world.debug.drawComponentForces = not world.debug.drawComponentForces
+
+    elif symbol == KEY.LEFT:
+        for agent in world.agents:
+            agent.size -= 1
+            agent.updateStats()
+    elif symbol == KEY.RIGHT:
+        for agent in world.agents:
+            agent.size += 1
+            agent.updateStats()
 
     else:
         world.keyPressed(symbol, modifiers)
@@ -104,10 +113,10 @@ if __name__ == '__main__':
     
 
     # add agents
-    numAgents = 10
+    numAgents = 3
     world.add_agent(numAgents)
     world.agents[0].chosenOne = True
-    world.syncParams()
+    # world.syncParams()
 
 
     # unpause the world ready for movement

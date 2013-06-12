@@ -109,7 +109,24 @@ class Util(object):
 
         return pointsCopy
 
+    @staticmethod
+    def clamp(minimum, x, maximum):
+        return max(minimum, min(x, maximum))
 
+    #  Returns a scaling function based on tuples for domain and range
+    @staticmethod
+    def linearScale(domain, range):
+
+        rise = range[1] - range[0]
+        run = domain[1] - domain[0]
+        
+        m = rise / run
+        c = range[1] - m * domain[1]
+
+        def f(x):
+            return m * x + c
+
+        return f
 
 
 

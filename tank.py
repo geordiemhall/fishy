@@ -1,6 +1,9 @@
 from vector2d import Rect
 from util import DictWrap
 from graphics import egi
+from random import uniform
+from vector2d import Vector2D
+
 
 
 class Tank(object):
@@ -17,6 +20,9 @@ class Tank(object):
 		})
 
 		self.resize()
+
+	def randomPosition(self):
+		return Vector2D(uniform(0, self.world.width), uniform(0, self.world.height))
 		
 
 	def resize(self):
@@ -29,6 +35,11 @@ class Tank(object):
 		})
 
 		self.box = Rect(bounds)
+
+		self.size = DictWrap({
+			'width': self.box.right - self.box.left,
+			'height': self.box.top - self.box.bottom
+		})
 
 	def render(self):
 		egi.blue_pen()

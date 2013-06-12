@@ -183,4 +183,4 @@ class Vector2D(object):
         return Vector2D(lhs/self.x, lhs/self.y)
 
     def __str__(self):
-        return '[%7.2f, %7.2f]' % (self.x, self.y)
+        return '(%7.2f, %7.2f)' % (self.x, self.y)

@@ -7,7 +7,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 from vector2d import Vector2D
 from vector2d import Point2D
 from graphics import egi, KEY
-from math import sin, cos, radians
+from math import sin, cos, radians, sqrt
 from random import random, randrange, uniform
 
 from path import Path
@@ -31,10 +31,10 @@ class Fish(object):
         self.world = world
         self.mode = mode
         # use the world's path initially
-        self.path = world.path
+        # self.path = world.path
         # where am i and where am i going? random
         dir = radians(random()*360)
-        self.pos = Vector2D(randrange(world.width),randrange(world.height))
+        self.pos = Vector2D(uniform(0, world.width), uniform(0, world.height))
         self.vel = Vector2D()
         self.heading = Vector2D(sin(dir),cos(dir))
         self.side = self.heading.perp()
@@ -42,6 +42,7 @@ class Fish(object):
         self.scaleValue = scale
         self.force = Vector2D() # current steering force
         self.mass = mass
+        self._clock = 0
 
         # limits?
         self.max_speed = 18.0 * scale
@@ -63,7 +64,7 @@ class Fish(object):
 
         # NEW WANDER INFO
         self.wander_target = Vector2D(1,0)
-        self.wander_dist = 1.0 * scale # adjust
+        self.wanderDistance = 1.0 * scale # adjust
         self.wander_radius = 1.2 * scale # adjusteg something bigger than the scale 
         self.wander_jitter = 10.0 * scale
         self.bRadius = scale
@@ -71,10 +72,10 @@ class Fish(object):
         # self.max_wander_speed = 200
 
         # Group dynamic variables
-        self.alignmentInfluence = 100
-        self.separationInfluence = 100
+        self.alignmentInfluence = 12
+        self.separationInfluence = 700
         self.wanderInfluence = 2
-        self.cohesionInfluence = 10
+        self.cohesionInfluence = 11
 
         self.neighbourDistance = 8 * scale
         self.isNeighbour = False # Draw yourself a different colour cause you're a neighbour of the chosen one
@@ -84,8 +85,6 @@ class Fish(object):
     def flock(self, delta):
 
         
-
-        wanderForce = self.wander(delta)
         alignment = self.alignment()
         separation = self.separationForce()
         cohesion = self.cohesionForce()
@@ -101,10 +100,10 @@ class Fish(object):
             egi.grey_pen()
             egi.line_with_arrow(self.pos, self.pos + self.force * s, 10)
 
-        return wanderForce + alignment + separation + cohesion
+        return alignment + separation + cohesion
 
 
-    def calculate(self, delta):
+    def calculateAcceleration(self, delta):
 
         # self.force = self.flock(delta)
         self.force = self.wander(delta)
@@ -112,20 +111,30 @@ class Fish(object):
         return self.force / self.mass
 
 
+    # Calculates velocity based on our acceleration
+    def calculateVelocity(self, delta):
+        # new velocity
+        vel = self.vel + self.acceleration * delta
+        
+        # check for limits of new velocity
+        max = self.max_speed
+        vel.truncate(max)
+
+        return vel
+
+
     def update(self, delta):
+
+        self._clock += delta
 
         # Grab our neighbours
         self.neighbours = self.world.getNeighbours(self, self.neighbourDistance)  
 
         ''' update vehicle position and orientation '''
-        acceleration = self.calculate(delta)
+        self.acceleration = self.calculateAcceleration(delta)
+
+        self.vel = self.calculateVelocity(delta)
         
-        # new velocity
-        self.vel += acceleration * delta
-        
-        # check for limits of new velocity
-        max = self.max_speed
-        self.vel.truncate(max)
         
         # update position
         self.pos += self.vel * delta
@@ -139,10 +148,7 @@ class Fish(object):
         self.world.wrap_around(self.pos)
 
 
-
-    def render(self,color=None):
-
-        ''' Draw the triangle agent with color'''
+    def drawBody(self, color=None):
         egi.set_pen_color(name=self.color)
 
         if(self.world.debug.drawDebug):
@@ -151,9 +157,36 @@ class Fish(object):
             elif(self.chosenOne): 
                 egi.set_pen_color(name='WHITE')
 
-        pts = self.world.transform_points(self.vehicle_shape, self.pos, self.heading, self.side, self.scale)
+        pts = self.world.transform_points(self.vehicle_shape, self.renderPosition, self.heading, self.side, self.scale)
         # draw it!
         egi.closed_shape(pts)
+
+        self.drawEye(color)
+
+
+    def beforeRender(self):
+        
+        pass
+
+
+    def drawEye(self, color=None):
+
+        pass
+
+
+    def calculateRenderPosition(self):
+        self.renderPosition = self.pos
+
+
+    def render(self,color=None):
+
+        self.calculateRenderPosition()
+        
+        
+
+        ''' Draw the triangle agent with color'''
+        self.drawBody(color)
+        
 
         if not self.world.debug.drawDebug or not self.chosenOne:
             return
@@ -161,19 +194,19 @@ class Fish(object):
             
         egi.orange_pen()
         wnd_pos = Vector2D(0, 0)
-        wld_pos = self.world.transform_point(wnd_pos, self.pos, self.heading, self.side) # draw the wander circle
+        wld_pos = self.world.transform_point(wnd_pos, self.renderPosition, self.heading, self.side) # draw the wander circle
         egi.circle(wld_pos, self.neighbourDistance)
 
         # Draw wander info
         # calculate the center of the wander circle
-        wnd_pos = Vector2D(self.wander_dist, 0)
-        wld_pos = self.world.transform_point(wnd_pos, self.pos, self.heading, self.side) # draw the wander circle
+        wnd_pos = Vector2D(self.wanderDistance, 0)
+        wld_pos = self.world.transform_point(wnd_pos, self.renderPosition, self.heading, self.side) # draw the wander circle
         egi.green_pen()
         egi.circle(wld_pos, self.wander_radius)
         # draw the wander target (little circle on the big circle)
         egi.red_pen()
-        wnd_pos = (self.wander_target + Vector2D(self.wander_dist,0))
-        wld_pos = self.world.transform_point(wnd_pos, self.pos, self.heading, self.side)
+        wnd_pos = (self.wander_target + Vector2D(self.wanderDistance,0))
+        wld_pos = self.world.transform_point(wnd_pos, self.renderPosition, self.heading, self.side)
         egi.circle(wld_pos, 3)
 
         if self.mode == 'flee':
@@ -187,6 +220,9 @@ class Fish(object):
 
     def speed(self):
         return self.vel.length()
+
+    def speedSqrt(self):
+        return sqrt(self.speed())
 
     #--------------------------------------------------------------------------
 
@@ -235,7 +271,7 @@ class Fish(object):
         wt *= self.wander_radius
 
         # move the target into a position WanderDist in front of the agent
-        target = wt + Vector2D(self.wander_dist, 0)
+        target = wt + Vector2D(self.wanderDistance, 0)
         
         # project the target into world space
         wld_target = self.world.transform_point(target, self.pos, self.heading, self.side) # and steer towards it
@@ -281,7 +317,7 @@ class Fish(object):
         for agent in self.neighbours:           
             toNeighbour = agent.pos.distanceTo(self.pos)
             # scale based on inverse distance to neighbour 
-            steeringForce += toNeighbour.normalise() / toNeighbour.length()
+            steeringForce += toNeighbour.normalise() / (toNeighbour.length() + 0.1)
 
         
 
