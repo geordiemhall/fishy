@@ -44,3 +44,7 @@ class Tank(object):
 	def render(self):
 		egi.blue_pen()
 		egi.rect(*self.box.getBox())
+
+
+
+		

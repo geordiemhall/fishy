@@ -1,6 +1,7 @@
 # Util
 # ==================================
 
+
 import copy
 
 class DictWrap(object):
@@ -127,6 +128,17 @@ class Util(object):
             return m * x + c
 
         return f
+
+    # Returns a new array of points copied
+    @staticmethod
+    def copyPoints(points):
+        return [pt.copy() for pt in points]   
+
+
+    
+    
+    
+   
 
 
 

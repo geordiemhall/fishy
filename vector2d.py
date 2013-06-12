@@ -4,7 +4,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 Updated by Steve Dower
 '''
 
-from math import sqrt, cos
+from math import sqrt, cos, sin, acos, asin, tan, atan
 from util import DictWrap
 from point2d import Point2D
 
@@ -128,9 +128,52 @@ class Vector2D(object):
         # eg the path of a ball reflected off a wall
         self += 2.0 * self.dot(norm) * norm.get_reverse()
 
-    def get_reverse(self):
+        return self
+
+    def get_reflected(self, norm):
+        ''' Reflect self around the norm vector provided. '''
+        # eg the path of a ball reflected off a wall
+        temp = self.copy()
+        temp += 2.0 * temp.dot(norm) * norm.get_reverse()
+
+        return temp
+
+
+    def reverse(self):
+        ''' reverse of ourself, return self for chaining. '''
+        self.x *= -1
+        self.y *= -1
+
+        return self
+
+
+    def get_reversed(self):
         ''' return a new vector that is the reverse of self. '''
         return Vector2D(-self.x, -self.y)
+
+
+    def rotate(self, angle):
+
+        cs = cos(angle)
+        sn = sin(angle)
+
+        px = self.x * cs - self.y * sn;
+        py = self.x * sn + self.y * cs;
+
+        self.x = px
+        self.y = py
+
+        return self
+
+
+
+    def get_rotated(self, angle):
+        ''' return a new gector that is the '''
+        return self.copy().rotate(angle)
+
+
+    def tuple(self):
+        return (self.x, self.y)
 
     def __neg__(self): #
         ''' get_reverse(), but using - operator based instead. '''

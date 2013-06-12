@@ -12,6 +12,7 @@ from fish import Fish
 from util import DictWrap
 from path import Path
 from guppy import Guppy
+from util import Util
 from tank import Tank
 
 class World(object):
@@ -25,6 +26,8 @@ class World(object):
         self.width = width
         self.height = height
         self.center = Vector2D(width/2, height/2)
+
+        self.solids = []
 
         
         
@@ -150,13 +153,14 @@ class World(object):
     World logic 
     =================================='''
 
-    def add_agent(self, num=1):
+    def addAgent(self, num=1):
         for _ in xrange(num):
             newAgent = Guppy(world=self, scale=10)
             self.agents.append(newAgent)
+            self.solids.append(newAgent)
 
 
-    def randomize_path(self):
+    def randomizePath(self):
         self.path.create_random_path(8, self.width/6, self.height/6, self.width*2/3 + self.width/6, self.height*2/3 + self.height/6)
         for agent in self.agents:
                 agent.path = self.path
@@ -209,21 +213,27 @@ class World(object):
             pos.y = max_y - pos.y
 
 
-    def transform_points(self, points, pos, forward, side, scale):
+    def transform_points(self, points, pos, forward, side, scale=Vector2D(1, 1)):
         ''' Transform the given list of points, using the provided position,
             direction and scale, to object world space. '''
         # make a copy of original points (so we don't trash them)
-        wld_pts = [pt.copy() for pt in points]
+        wld_pts = Util.copyPoints(points)
+
         # create a transformation matrix to perform the operations
         mat = Matrix33()
+
         # scale,
         mat.scale_update(scale.x, scale.y)
+
         # rotate
         mat.rotate_by_vectors_update(forward, side)
+
         # and translate
         mat.translate_update(pos.x, pos.y)
+
         # now transform all the points (vertices)
         mat.transform_vector2d_list(wld_pts)
+
         # done
         return wld_pts
 
@@ -233,14 +243,19 @@ class World(object):
         and direction (forward and side unit vectors), to object world space. '''
         # make a copy of the original point (so we don't trash it)
         wld_pt = point.copy()
+
         # create a transformation matrix to perform the operations
         mat = Matrix33()
+
         # rotate
         mat.rotate_by_vectors_update(forward, side)
+
         # and translate
         mat.translate_update(pos.x, pos.y)
+
         # now transform the point (in place)
         mat.transform_vector2d(wld_pt)
+
         # done
         return wld_pt
 

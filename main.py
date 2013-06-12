@@ -54,7 +54,7 @@ def on_key_press(symbol, modifiers):
     #         agent.mode = AGENT_MODES[symbol]
     elif symbol == KEY.A:
         # Add an another agent when A is pressed
-        world.add_agent()
+        world.addAgent()
         # world.syncParams()
 
     elif symbol == KEY.I:
@@ -114,9 +114,8 @@ if __name__ == '__main__':
 
     # add agents
     numAgents = 3
-    world.add_agent(numAgents)
+    world.addAgent(numAgents)
     world.agents[0].chosenOne = True
-    # world.syncParams()
 
 
     # unpause the world ready for movement

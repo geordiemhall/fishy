@@ -33,7 +33,7 @@ class Guppy(Fish):
 		self._sizes = (0.0, 20.0)
 		self._stats = DictWrap({
 			'body': (0.7, 4.0),
-			'mass': (0.8, 20.0),
+			'mass': (0.5, 20.0),
 			'speed': (100, 50),
 			'flockingInfluence': (0.05, -0.05 * 2),
 			'wanderDistance': (20, 50),
@@ -117,12 +117,16 @@ class Guppy(Fish):
 
 		# Fish shape
 		self.body = self.stat('body')
+
+		# Bounding radius (used in collision detection)
+		self.boundingRadius = self.body * 15
+
+		# Build our outline shape, scaled to body size
 		self.fishShape = self.fishShapeForScale(self.body)
 		
 
 		# Wander distance
 		# Make sure it's always outside the body, to prevent helicoptering
-		# self.wanderDistance = self.body * self.scaleValue * 1.5
 		self.wanderDistance = self.stat('wanderDistance')
 		self.neighbourDistance = self.stat('neighbourDistance')
 
@@ -197,16 +201,20 @@ class Guppy(Fish):
 		flockForce = self.flock(delta) * self.flockingInfluence
 		# swayForce = self.sway(delta)
 
+		netForce = wanderForce + flockForce
+
 		# print 'self.flockingInfluence', self.flockingInfluence
 
-		if(self.world.debug.drawDebug):
+		if(self.world.debug.drawDebug and self.chosenOne):
 			egi.blue_pen()
 			egi.line_by_pos(self.pos, self.pos + wanderForce * 5)
 			egi.green_pen()
 			egi.line_by_pos(self.pos, self.pos + flockForce * 5)
+			egi.orange_pen()
+			egi.line_by_pos(self.pos, self.pos + netForce * 5)
 
 
-		netForce = wanderForce + flockForce
+		
 
 		
 
