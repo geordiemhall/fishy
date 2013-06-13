@@ -4,7 +4,7 @@ Guppy
 
 from fish import Fish
 from vector2d import Vector2D
-from graphics import egi, KEY
+from graphics import egi, KEY, COLOR_NAMES, rgba
 from math import sin, cos, radians, sqrt
 from random import random, randrange, uniform
 from matrix33 import Matrix33
@@ -13,6 +13,7 @@ import copy
 
 
 from util import Util, DictWrap
+
 from path import Path
 
 class Guppy(Fish):
@@ -24,7 +25,7 @@ class Guppy(Fish):
 		print 'Guppy init'
 
 		# Set up some rendering properties
-		self.color = 'ORANGE'
+		self.color = self.getColor()
 		self.initShape()
 		
 
@@ -35,9 +36,10 @@ class Guppy(Fish):
 			'body': (0.7, 4.0),
 			'mass': (0.5, 10.0),
 			'speed': (100, 50),
-			'flockingInfluence': (0.05, 0),
-			'wanderDistance': (20, 50),
-			'neighbourDistance': (200, 300)
+			'flockingInfluence': (0.2, 0),
+			'wanderDistance': (30, 50),
+			'wanderRadius': (0.6 * self.scaleValue, 2.4 * self.scaleValue),
+			'neighbourDistance': (100, 300)
 		})
 
 		# Set up the states
@@ -47,7 +49,7 @@ class Guppy(Fish):
 			'idle': {
 				'speedMultiplier': 1,
 				'massMultiplier': 1,
-				'wanderInfluence': 1,
+				'wanderInfluence': 0.4,
 				'steering': self.idleSteer
 			},
 			'feeding': {
@@ -69,6 +71,21 @@ class Guppy(Fish):
 		# child/parent scales
 		self.updateStats()
 		self.vehicle_shape = self.fishShape # get an initial shape just in case
+
+	
+	def getColor(self):
+		colors = [
+			rgba('ffae00'),
+			rgba('ff8400')
+		]
+
+		print colors
+
+		return (uniform(colors[0][0], colors[1][0]),
+				uniform(colors[0][1], colors[1][1]),
+				uniform(colors[0][2], colors[1][2]),
+				uniform(0.8, 1.0))
+
 
 
 
@@ -104,7 +121,7 @@ class Guppy(Fish):
 
 		# Speed
 		max = self.stat('speed')
-		self.max_speed = max
+		self.maxSpeed = max
 
 		# Flocking influence
 		self.flockingInfluence = self.stat('flockingInfluence')
@@ -125,6 +142,7 @@ class Guppy(Fish):
 		# Wander distance
 		# Make sure it's always outside the body, to prevent helicoptering
 		self.wanderDistance = self.stat('wanderDistance')
+		self.wanderRadius = self.stat('wanderRadius')
 		self.neighbourDistance = self.stat('neighbourDistance')
 
 		
@@ -138,7 +156,9 @@ class Guppy(Fish):
 		# Speed up fins as we slow down, illusion of swimming harder
 		frequency = sqrtSpeed * 0.4
 		# The bigger the fish, the slower it should paddle
-		frequency /= (1 + self.body * 0.25)
+		# frequency /= (1 + self.body * 0.25)
+
+		frequency = Util.clamp(4, frequency, 10)
 
 		# print 'sqrtSpeed', self.speedSqrt(), 'freq', frequency
 
@@ -174,17 +194,17 @@ class Guppy(Fish):
 		
 
 	def drawEye(self, color=None):
-
-	    egi.circle(self.renderPosition + self.side * self.body, self.body)
+		egi.set_pen_color(rgba('fff', 0.5))
+		egi.circle(self.renderPosition + self.side * self.body, self.body)
 
 
 	def beforeRender(self):
-	    # Update the rotation
-	    
+		# Update the rotation
+		
 
-	    egi.green_pen()
-	    # line = self.matrix.transform_vector2d(Vector2D(0, 100))
-	    # egi.line_by_pos(self.pos, self.pos + line )
+		egi.green_pen()
+		# line = self.matrix.transform_vector2d(Vector2D(0, 100))
+		# egi.line_by_pos(self.pos, self.pos + line )
 
 	def calculateRenderPosition(self):
 
@@ -203,29 +223,22 @@ class Guppy(Fish):
 		state = self.currentState()
 
 		wanderForce = self.wander(delta) * state.wanderInfluence
-		# wanderForce = Vector2D()
+		
 		flockForce = self.flock(delta) * self.flockingInfluence
-		# swayForce = self.sway(delta)
+
 		# obstaclesForce = self.obstacleAvoidance(self.world.solids)
+
 		wallForce = self.wallAvoidance(self.world.tank.walls) * 2
 
-		# wallForce *= (1 + wallForce.lengthSq() * 0.01)
+		distanceFromCenterSq = (self.pos - self.world.center).lengthSq()
 
-		# Reduce the other forces based on the wallForce
-		# if(wallForce.lengthSq() > 5):
-		# 	diminish = wallForce.lengthSq()
-		# 	print 'diminish', diminish
-		# 	flockForce /= diminish
-		# 	print 'flockForce now', flockForce
-
-		distanceFromCenter = (self.pos - self.world.center).lengthSq()
-		amount = 1 + distanceFromCenter * 0.00002
-		# if(distanceFromCenter > 50):
+		amount = 1 + distanceFromCenterSq * 0.00002
+		# if(distanceFromCenterSq > 50):
 			# print 'amount', amount
 		flockForce /= amount
 
 		centerForce = self.seek(self.world.center)
-		centerForce *= amount**2.2 * 0.02
+		centerForce *= amount**2.2 * 0.01
 
 
 
@@ -268,17 +281,15 @@ class Guppy(Fish):
 		vel = self.vel + self.acceleration * delta
 		
 		# check for limits of new velocity based on current state
-		max = self.max_speed * self.currentState().speedMultiplier
+		max = self.maxSpeed * self.currentState().speedMultiplier
 		vel.truncate(max)
 
 		if(self.varyVelocity):
-
-			sqrtSpeed = self.speedSqrt()
 			frequency = 8
 
 
 			offsetAngle = (cos((self.world._clock) * frequency / 2)) * 0.1 + 0.1
-			egi.text_at_pos(10, 10, str(offsetAngle))
+			
 			vel *= (1 + offsetAngle + uniform(0, 0.1))
 
 

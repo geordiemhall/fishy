@@ -5,7 +5,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 '''
 
 from vector2d import Vector2D, Point2D, Rect
-from graphics import egi
+from graphics import egi, COLOR_NAMES, rgba
 from math import sin, cos, radians, sqrt, pi
 from random import random, randrange, uniform
 
@@ -50,7 +50,7 @@ class Fish(object):
 		self.radius = 15
 
 		# limits?
-		self.max_speed = 18.0 * scale
+		self.maxSpeed = 18.0 * scale
 		self.fleeDistance = 200
 		self.waypointThreshold = 50
 		self.waypointThresholdSq = self.waypointThreshold**2
@@ -59,7 +59,7 @@ class Fish(object):
 		
 
 		# data for drawing this agent
-		self.color = 'ORANGE'
+		self.color = COLOR_NAMES['ORANGE']
 		self.vehicle_shape = [
 			Point2D(-1.0, 0.6),
 			Point2D( 1.0, 0.0),
@@ -70,15 +70,15 @@ class Fish(object):
 		# NEW WANDER INFO
 		self.wander_target = Vector2D(1,0)
 		self.wanderDistance = 1.0 * scale # adjust
-		self.wander_radius = 1.2 * scale # adjusteg something bigger than the scale 
+		self.wanderRadius = 1.2 * scale # adjusteg something bigger than the scale 
 		self.wander_jitter = 10.0 * scale
 		self.bRadius = scale
 		self.max_force = 400
 		# self.max_wander_speed = 200
 
 		# Group dynamic variables
-		self.alignmentInfluence = 13
-		self.separationInfluence = 500
+		self.alignmentInfluence = 25
+		self.separationInfluence = 200
 		self.wanderInfluence = 2
 		self.cohesionInfluence = 11
 
@@ -109,7 +109,7 @@ class Fish(object):
 		vel = self.vel + self.acceleration * delta
 		
 		# check for limits of new velocity
-		max = self.max_speed
+		max = self.maxSpeed
 		vel.truncate(max)
 
 		return vel
@@ -146,7 +146,7 @@ class Fish(object):
 
 
 	def drawBody(self, color=None):
-		egi.set_pen_color(name=self.color)
+		egi.set_pen_color(self.color)
 
 		if(self.world.debug.drawDebug):
 			if(self.isNeighbour): 
@@ -198,20 +198,20 @@ class Fish(object):
 		# Debug stuff to only draw for one agent
 
 
-		egi.grey_pen()
+		egi.orange_pen()
 		egi.circle(self.pos, self.boundingRadius)
 
-		egi.orange_pen()
+		egi.grey_pen()
 		wnd_pos = Vector2D(0, 0)
-		wld_pos = self.world.transform_point(wnd_pos, self.renderPosition, self.heading, self.side) # draw the wander circle
-		egi.circle(wld_pos, self.neighbourDistance)
+		
+		egi.circle(self.pos, self.neighbourDistance)
 
 		# Draw wander info
 		# calculate the center of the wander circle
 		wnd_pos = Vector2D(self.wanderDistance, 0)
 		wld_pos = self.world.transform_point(wnd_pos, self.renderPosition, self.heading, self.side) # draw the wander circle
 		egi.green_pen()
-		egi.circle(wld_pos, self.wander_radius)
+		egi.circle(wld_pos, self.wanderRadius)
 		# draw the wander target (little circle on the big circle)
 		egi.red_pen()
 		wnd_pos = (self.wander_target + Vector2D(self.wanderDistance,0))
@@ -249,8 +249,32 @@ class Fish(object):
 
 	def seek(self, target_pos):
 		''' move towards target position '''
-		desired_vel = (target_pos - self.pos).normalise() * self.max_speed
+		desired_vel = (target_pos - self.pos).normalise() * self.maxSpeed
 		return (desired_vel - self.vel)
+
+
+
+	def steer_to(self, target):
+		desired = target - self.pos # A vector pointing from the location to the target
+		d = desired.length()  # Distance from the target is the magnitude of the vector
+
+		# If the distance is greater than 0, calc steering (otherwise return zero vector)
+		if d > 0:
+			desired.normalise()
+
+			# Two options for desired vector magnitude (1 -- based on distance, 2 -- maxspeed)
+			if d < 100.0:
+				desired *= (self.maxSpeed * ( d / 100.0 ) ) # This damping is somewhat arbitrary
+			else:
+				desired *= (self.maxSpeed)
+
+			# Steering = Desired minus Velocity
+			steer = desired - self.vel
+			steer.truncate(self.max_force)  # Limit to maximum steering force
+		else:
+			steer = Vector2D()
+
+		return steer
 
 
 	def arrive(self, target_pos, speed):
@@ -264,7 +288,7 @@ class Fish(object):
 			# desired deceleration rate
 			speed =  dist / decel_rate # * 0.5
 			# make sure the velocity does not exceed the max
-			speed = min(speed, self.max_speed)
+			speed = min(speed, self.maxSpeed)
 			# from here proceed just like Seek except we don't need to
 			# normalize the to_target vector because we have already gone to the
 			# trouble of calculating its length for dist.
@@ -289,7 +313,7 @@ class Fish(object):
 
 		# increase the length of the vector to the same as the radius
 		# of the wander circle
-		wt *= self.wander_radius
+		wt *= self.wanderRadius
 
 		# move the target into a position WanderDist in front of the agent
 		target = wt + Vector2D(self.wanderDistance, 0)
@@ -321,7 +345,7 @@ class Fish(object):
 		separation = self.separationForce()
 		cohesion = self.cohesionForce()
 
-		if(self.chosenOne and self.world.debug.drawComponentForces):
+		if(self.world.debug.drawComponentForces):
 			s = 0.1
 			egi.green_pen()
 			egi.line_with_arrow(self.pos, self.pos + alignment * s, 10)
@@ -337,6 +361,38 @@ class Fish(object):
 
 	def alignment(self):
 
+		# Clinton's version
+		avg = Vector2D() 
+		count = 0
+
+
+		for agent in self.neighbours:
+			d = self.pos.distance(agent.pos)
+			if(d > 0):
+
+				avg += agent.vel 
+				count += 1
+
+		
+		
+		if count > 0:
+			avg /= float(count) 
+
+		avg *= 150
+		
+		avg.truncate(self.max_force)
+
+		return avg
+
+		# egi.set_pen_color(rgba('f600ff'))
+		# egi.line_by_pos(self.pos, self.pos + self.heading.normalise() * 300)
+
+		# steeringForce = self.seek(avgHeading)
+
+		# return steeringForce * self.alignmentInfluence
+
+
+		# My version
 		steeringForce = Vector2D() 
 	
 		if(len(self.neighbours) == 0):
@@ -354,6 +410,41 @@ class Fish(object):
 
 	def separationForce(self):
 
+		avg = Vector2D()
+		count = 0
+
+		# Radius within which to steer away
+		DESIRED_SEPARATION = 60
+		egi.circle(self.pos, DESIRED_SEPARATION)
+
+		for agent in self.neighbours:
+			d = self.pos.distance(agent.pos)
+			if d > 0 and d < DESIRED_SEPARATION:
+				# Normalized, weighted by distance vector pointing away from the neighbour
+
+				direction = (self.pos - agent.pos).normalise()
+				# print 'direction', direction
+				amount = direction / d
+				
+				avg += amount
+				count += 1
+
+
+		if(count > 0):
+			avg /= float(count)
+
+		
+
+		avg *= 10000
+
+		avg.truncate(self.max_force)
+		
+
+		return avg
+
+
+
+
 		steeringForce = Vector2D() 
 
 		if(len(self.neighbours) == 0):
@@ -361,19 +452,41 @@ class Fish(object):
 
 		
 
-		for agent in self.neighbours:           
-			toNeighbour = agent.pos.distanceTo(self.pos)
+		for agent in self.neighbours:	      
+			# toNeighbour = agent.pos.distanceTo(self.pos)
+			toNeighbour = self.pos - agent.pos
 			# scale based on inverse distance to neighbour 
-			steeringForce += toNeighbour.normalise() / (toNeighbour.length() + 0.1)
+			steeringForce += toNeighbour.normalise() / (toNeighbour.length() + 0.01) # prevent divide by zero
 
 		
 
 		# steeringForce = self.seek(-steeringForce)
 
+		
+
 		return steeringForce * self.separationInfluence
 
 
 	def cohesionForce(self):
+
+
+		sum = Vector2D()
+		count = 0
+
+		for agent in self.neighbours:
+			d = self.pos.distance(agent.pos)
+			if d > 0:
+				sum += agent.pos
+				count += 1
+
+		if count > 0:
+			sum = self.steer_to(sum / float(count)) * 6
+		
+		return sum # Empty vector contributes nothing
+
+
+
+
 
 		steeringForce = Vector2D()
 
@@ -446,7 +559,7 @@ class Fish(object):
 
 	def obstacleAvoidance(self, objects):
 		# calc a "Detection Box" length proportional to current speed
-		boxLength = self.minBoxLength + (self.speed() / self.max_speed) * self.minBoxLength
+		boxLength = self.minBoxLength + (self.speed() / self.maxSpeed) * self.minBoxLength
 		boxWidth = self.boundingRadius * 2
 
 		# Draw the collision box

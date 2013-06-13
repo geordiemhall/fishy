@@ -14,6 +14,7 @@ from path import Path
 from guppy import Guppy
 from util import Util
 from tank import Tank
+from food import Food
 
 
 class World(object):
@@ -27,12 +28,14 @@ class World(object):
         self.width = width
         self.height = height
         self.center = Vector2D(width/2, height/2)
+        
 
         self.obstacles = []
         self._clock = 0
         
         
         self.scale = 10
+        self.gravity = Vector2D(0, -900)
         # self.path = Path(maxx=width, maxy=height, num_pts=5)
         
 
@@ -52,6 +55,7 @@ class World(object):
     
     def makeFood(self):
         self.food = []
+        self.foodDistance = 30
 
 
     def makeTank(self):
@@ -59,9 +63,10 @@ class World(object):
         self.tank = Tank(world=self)
         print 'after make tank'
 
-    def addFood(self, num = 1):
+    def addFood(self, x, num = 1):
         for _ in range(num):
-            newFood = Food()
+            newFood = Food(world=self)
+            newFood.pos = Vector2D(x, self.height - self.foodDistance)
             self.food.append(newFood)
 
 
@@ -69,8 +74,9 @@ class World(object):
 
         if not self.paused:
             self._clock += delta
-            for agent in self.agents:
-                agent.update(delta)
+            [a.update(delta) for a in self.agents]
+            [a.update(delta) for a in self.food]
+           
 
 
     def generateInfo(self):
@@ -110,21 +116,22 @@ class World(object):
 
     def render(self):
         
-        # Draw background
-        egi.set_pen_color(rgba('111'))
-        world = Rect({'left': 0, 'bottom': 0, 'right':self.width, 'top':self.height}).getPoints()
-        egi.closed_shape(world, filled=True)
+        
 
+        # Draw tank first
         self.tank.render()
 
-        for agent in self.agents:
-            agent.render()
+        # Then agents
+        [a.render() for a in self.agents]
 
+        # Food
+        [a.render() for a in self.food]
+
+        # And finally info text
         if self.debug.showInfo:
             self.drawInfo()
 
-        egi.red_pen()
-        egi.circle(self.center, 5)
+        
         
 
 

@@ -17,15 +17,18 @@ class Tank(object):
 
 		self.world = world
 
+		# Water colors
+		self.water = ('27c8f0', '1fa3ff', '0069d5')
+
 		# Don't let fish spawn within this far of the edge
 		self.padding = 50
 
-		
+		m = 20
 		self.margin = DictWrap({
-			'left': 10,
+			'left': m,
 			'top': 100,
-			'right': 10,
-			'bottom': 10
+			'right': m,
+			'bottom': m
 		})
 
 		self.resize()
@@ -133,17 +136,17 @@ class Tank(object):
 		egi.green_pen()
 		seed = self.world._clock * 2
 
-		water = '27c8f0'
+		water = self.water
 		egi.set_stroke(2)
 
-		egi.set_pen_color(color=rgba(water, 0.5))
+		egi.set_pen_color(color=rgba(water[0], 0.5))
 		egi.unclosed_shape(self.createWave(seed= seed, amplitude = 7, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 10) ))
 		
-		egi.set_pen_color(color=rgba('1fa3ff', 0.5))
+		egi.set_pen_color(color=rgba(water[1], 0.5))
 		egi.unclosed_shape(self.createWave(seed= seed/2, amplitude = 3, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 0) ))
 		
 		
-		egi.set_pen_color(color=rgba('0387ed', 0.5))
+		egi.set_pen_color(color=rgba(water[2], 0.5))
 		egi.unclosed_shape(self.createWave(seed= seed/3, amplitude = 10, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 0) ))
 		
 

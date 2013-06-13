@@ -123,13 +123,13 @@ class EasyGraphics(object):
         glEnd()
 
     def unclosed_shape(self, points):
-        l = len(points)
-        if(l < 2): return
+        if(len(points) < 2): return
+
+        glBegin(GL_LINE_STRIP)
+
+        [glVertex2f(p.x, p.y) for p in points]
         
-        i = 1
-        while i < l:
-            self.line_by_pos(points[i-1], points[i])
-            i += 1
+        glEnd()
         
 
 
