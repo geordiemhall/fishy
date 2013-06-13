@@ -6,7 +6,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 
 from vector2d import Vector2D, Rect
 from matrix33 import Matrix33
-from graphics import egi, KEY
+from graphics import *
 
 from fish import Fish
 from util import DictWrap
@@ -14,6 +14,7 @@ from path import Path
 from guppy import Guppy
 from util import Util
 from tank import Tank
+
 
 class World(object):
 
@@ -27,8 +28,8 @@ class World(object):
         self.height = height
         self.center = Vector2D(width/2, height/2)
 
-        self.solids = []
-
+        self.obstacles = []
+        self._clock = 0
         
         
         self.scale = 10
@@ -58,11 +59,16 @@ class World(object):
         self.tank = Tank(world=self)
         print 'after make tank'
 
-    
+    def addFood(self, num = 1):
+        for _ in range(num):
+            newFood = Food()
+            self.food.append(newFood)
 
 
     def update(self, delta):
+
         if not self.paused:
+            self._clock += delta
             for agent in self.agents:
                 agent.update(delta)
 
@@ -103,13 +109,23 @@ class World(object):
     =================================='''
 
     def render(self):
+        
+        # Draw background
+        egi.set_pen_color(rgba('111'))
+        world = Rect({'left': 0, 'bottom': 0, 'right':self.width, 'top':self.height}).getPoints()
+        egi.closed_shape(world, filled=True)
+
+        self.tank.render()
+
         for agent in self.agents:
             agent.render()
 
         if self.debug.showInfo:
             self.drawInfo()
 
-        self.tank.render()
+        egi.red_pen()
+        egi.circle(self.center, 5)
+        
 
 
     def drawInfo(self):
@@ -157,7 +173,6 @@ class World(object):
         for _ in xrange(num):
             newAgent = Guppy(world=self, scale=10)
             self.agents.append(newAgent)
-            self.solids.append(newAgent)
 
 
     def randomizePath(self):
@@ -341,6 +356,8 @@ class World(object):
                 'increment': 0.1
             }
         ]
+
+        self.params = []
 
         self.generateInfo()
 

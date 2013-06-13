@@ -95,8 +95,16 @@ if __name__ == '__main__':
     width = 900
     height = 700
 
+
     # create a pyglet window and set glOptions
-    win = window.Window(width=width, height=height, vsync=True, resizable=True)
+    antialiased = True
+    win = None
+    if(antialiased):
+        config = pyglet.gl.Config(sample_buffers=1, samples=4)
+        win = window.Window(width=width, height=height, vsync=True, resizable=True, config=config)
+    else:
+        win = window.Window(width=width, height=height, vsync=True, resizable=True)
+    
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
     # needed so that egi knows where to draw

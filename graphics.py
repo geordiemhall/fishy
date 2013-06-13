@@ -35,6 +35,43 @@ COLOR_NAMES = { 'BLACK':  (0.0, 0.0, 0.0, 1),
                 'LIGHT_PINK': (1.0, 0.9, 0.9, 1)
                 }
 
+HEX = '0123456789abcdef'
+HEX2 = dict((a+b, HEX.index(a)*16 + HEX.index(b)) for a in HEX for b in HEX)
+
+def hex6(hex):
+    if(len(hex) == 3):
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
+    return hex
+
+def rgb(hex):
+    hex = hex.lower()
+    hex = hex6(hex)
+    return (HEX2[hex[0:2]]/255.0, HEX2[hex[2:4]]/255.0, HEX2[hex[4:6]]/255.0)
+
+def rgb255(hex):
+    hex = hex.lower()
+    return (HEX2[hex[0:2]], HEX2[hex[2:4]], HEX2[hex[4:6]])
+
+
+def hex(rgb):
+    return format((rgb[0]<<16)|(rgb[1]<<8)|rgb[2], '06x')
+
+def rgba(hex, alpha = 1):
+    val = rgb(hex)
+    return (val[0], val[1], val[2], alpha)
+
+
+print rgb('aabbcc')
+# (170, 187, 204)
+print hex((170, 187, 204))
+# aabbcc
+print rgb('aa0200')
+# (170, 2, 0)
+print hex((170, 2, 0))
+# aa0200
+
+print rgba('ff0000', 0.8)
+
 class EasyGraphics(object):
 
     def __init__(self):
@@ -85,6 +122,17 @@ class EasyGraphics(object):
         glVertex2f(x2, y2)
         glEnd()
 
+    def unclosed_shape(self, points):
+        l = len(points)
+        if(l < 2): return
+        
+        i = 1
+        while i < l:
+            self.line_by_pos(points[i-1], points[i])
+            i += 1
+        
+
+
     def polyline(self, points):
         if len(points) < 2: return
         pts = [(p.x, p.y) for p in points] # convert to list of tuples
@@ -94,6 +142,7 @@ class EasyGraphics(object):
         glVertexPointer(2,GL_FLOAT, 0, pts)
         glDrawArrays(GL_LINE_STRIP, 0, len(pts))
         glPopClientAttrib()
+        glEnd()
 
     def line_with_arrow(self,v1,v2,size):
         norm = v2-v1

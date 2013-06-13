@@ -46,7 +46,7 @@ class Fish(object):
 		self.scaleValue = scale
 		self.force = Vector2D() # current steering force
 		self.mass = mass
-		self._clock = 0
+		
 		self.radius = 15
 
 		# limits?
@@ -77,7 +77,7 @@ class Fish(object):
 		# self.max_wander_speed = 200
 
 		# Group dynamic variables
-		self.alignmentInfluence = 12
+		self.alignmentInfluence = 13
 		self.separationInfluence = 500
 		self.wanderInfluence = 2
 		self.cohesionInfluence = 11
@@ -117,7 +117,7 @@ class Fish(object):
 
 	def update(self, delta):
 
-		self._clock += delta
+		
 
 		# Grab our neighbours
 		self.neighbours = self.world.getNeighbours(self, self.neighbourDistance)  
@@ -463,13 +463,13 @@ class Fish(object):
 			pts = self.pointsInWorldSpace(boxPoints, self.pos)
 			print 'render points...', Util.strPoints(pts)
 			egi.red_pen()
-			egi.polyline(pts)
+			egi.closed_shape(pts)
 			simple = [
 				Vector2D(0, 10),
 				Vector2D(10, 10),
 				Vector2D(10, -10),
 				Vector2D(0, -10)]
-			egi.polyline(self.pointsInWorldSpace(simple, self.pos))
+			egi.closed_shape(self.pointsInWorldSpace(simple, self.pos))
 		
 		# note (tag) the objects in range
 		tagList = self.tagObjectsInViewRange(objects, boxLength, boxWidth)

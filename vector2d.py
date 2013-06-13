@@ -41,6 +41,27 @@ class Rect(object):
 
 
 
+class Points(object):
+    def __init__(self, pts = []):
+        self.pts = pts
+
+
+    def append(self, pt):
+        self.pts.append(pt)
+
+    def transform(self, matrix):
+        matrix.transform_vector2d_list(self.pts)
+        return self
+
+    def copy(self):
+        return Points([p.copy() for p in self.pts])
+
+    def reverse(self):
+        self.pts.reverse()
+        return self
+
+    def __str__(self):
+        return str([str(p) for p in self.pts])
 
 
 

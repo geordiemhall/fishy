@@ -136,11 +136,13 @@ class Guppy(Fish):
 		sqrtSpeed = self.speedSqrt()
 
 		# Speed up fins as we slow down, illusion of swimming harder
-		frequency = sqrtSpeed * 0.4 / (self.body / 5 + 1)
+		frequency = sqrtSpeed * 0.4
+		# The bigger the fish, the slower it should paddle
+		frequency /= (1 + self.body * 0.25)
 
 		# print 'sqrtSpeed', self.speedSqrt(), 'freq', frequency
 
-		swayAngle = sin(self._clock * frequency)
+		swayAngle = sin(self.world._clock * frequency)
 		# print 'frequency', frequency
 
 		swayRange = sqrtSpeed / 80
@@ -164,7 +166,7 @@ class Guppy(Fish):
 		swayRange = sqrtSpeed / 10
 
 
-		offsetAngle = cos((self._clock) * frequency / 2)
+		offsetAngle = cos((self.world._clock) * frequency / 2)
 		offset = self.side * swayRange * offsetAngle
 		position = self.pos + offset
 		
@@ -217,14 +219,17 @@ class Guppy(Fish):
 		# 	print 'flockForce now', flockForce
 
 		distanceFromCenter = (self.pos - self.world.center).lengthSq()
-		if(distanceFromCenter > 50):
-			amount = distanceFromCenter * 0.00005
+		amount = 1 + distanceFromCenter * 0.00002
+		# if(distanceFromCenter > 50):
 			# print 'amount', amount
-			flockForce /= (1 + amount)
+		flockForce /= amount
+
+		centerForce = self.seek(self.world.center)
+		centerForce *= amount**2.2 * 0.02
 
 
 
-		netForce = wanderForce + flockForce + wallForce
+		netForce = wanderForce + flockForce + wallForce + centerForce
 
 		# print 'self.flockingInfluence', self.flockingInfluence
 
@@ -237,6 +242,8 @@ class Guppy(Fish):
 			egi.line_by_pos(self.pos, self.pos + netForce * 5)
 			egi.red_pen()
 			egi.line_by_pos(self.pos, self.pos + wallForce * 5)
+			egi.set_pen_color(name='BROWN')
+			egi.line_by_pos(self.pos, self.pos + centerForce * 5)
 
 
 		
@@ -270,7 +277,7 @@ class Guppy(Fish):
 			frequency = 8
 
 
-			offsetAngle = (cos((self._clock) * frequency / 2)) * 0.1 + 0.1
+			offsetAngle = (cos((self.world._clock) * frequency / 2)) * 0.1 + 0.1
 			egi.text_at_pos(10, 10, str(offsetAngle))
 			vel *= (1 + offsetAngle + uniform(0, 0.1))
 
