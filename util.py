@@ -132,7 +132,11 @@ class Util(object):
     # Returns a new array of points copied
     @staticmethod
     def copyPoints(points):
-        return [pt.copy() for pt in points]   
+        return [pt.copy() for pt in points] 
+
+    @staticmethod
+    def strPoints(points):
+        return [str(pt) for pt in points]  
 
 
     

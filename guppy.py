@@ -33,9 +33,9 @@ class Guppy(Fish):
 		self._sizes = (0.0, 20.0)
 		self._stats = DictWrap({
 			'body': (0.7, 4.0),
-			'mass': (0.5, 20.0),
+			'mass': (0.5, 10.0),
 			'speed': (100, 50),
-			'flockingInfluence': (0.05, -0.05 * 2),
+			'flockingInfluence': (0.05, 0),
 			'wanderDistance': (20, 50),
 			'neighbourDistance': (200, 300)
 		})
@@ -58,7 +58,6 @@ class Guppy(Fish):
 			}
 		})
 
-		print self._states.idle.speedMultiplier
 
 		self.size = self._sizes[0]
 		self.varyVelocity = False
@@ -84,8 +83,6 @@ class Guppy(Fish):
 
 		sizeRange = self._sizes 	# domain
 		statRange = self._stats[key]	# range
-
-		print 'sizeRange', sizeRange,'statRange', statRange
 
 		scale = Util.linearScale(sizeRange, statRange)
 
@@ -119,7 +116,7 @@ class Guppy(Fish):
 		self.body = self.stat('body')
 
 		# Bounding radius (used in collision detection)
-		self.boundingRadius = self.body * 15
+		self.boundingRadius = self.body * 25
 
 		# Build our outline shape, scaled to body size
 		self.fishShape = self.fishShapeForScale(self.body)
@@ -134,9 +131,14 @@ class Guppy(Fish):
 
 	def swayShape(self):
 
+		# TODO: Optimise this somehow. 
+		# At the very least cache it so that both sway functions can use it without recalculating
 		sqrtSpeed = self.speedSqrt()
 
-		frequency = sqrtSpeed * 0.8
+		# Speed up fins as we slow down, illusion of swimming harder
+		frequency = sqrtSpeed * 0.4 / (self.body / 5 + 1)
+
+		# print 'sqrtSpeed', self.speedSqrt(), 'freq', frequency
 
 		swayAngle = sin(self._clock * frequency)
 		# print 'frequency', frequency
@@ -189,6 +191,8 @@ class Guppy(Fish):
 		self.vehicle_shape = self.swayShape()
 		
 	
+	def centerAttraction(self):
+		return self.seek(self.world.tank.center())
 
 
 
@@ -200,18 +204,39 @@ class Guppy(Fish):
 		# wanderForce = Vector2D()
 		flockForce = self.flock(delta) * self.flockingInfluence
 		# swayForce = self.sway(delta)
+		# obstaclesForce = self.obstacleAvoidance(self.world.solids)
+		wallForce = self.wallAvoidance(self.world.tank.walls) * 2
 
-		netForce = wanderForce + flockForce
+		# wallForce *= (1 + wallForce.lengthSq() * 0.01)
+
+		# Reduce the other forces based on the wallForce
+		# if(wallForce.lengthSq() > 5):
+		# 	diminish = wallForce.lengthSq()
+		# 	print 'diminish', diminish
+		# 	flockForce /= diminish
+		# 	print 'flockForce now', flockForce
+
+		distanceFromCenter = (self.pos - self.world.center).lengthSq()
+		if(distanceFromCenter > 50):
+			amount = distanceFromCenter * 0.00005
+			# print 'amount', amount
+			flockForce /= (1 + amount)
+
+
+
+		netForce = wanderForce + flockForce + wallForce
 
 		# print 'self.flockingInfluence', self.flockingInfluence
 
-		if(self.world.debug.drawDebug and self.chosenOne):
+		if(self.world.debug.drawDebug):
 			egi.blue_pen()
 			egi.line_by_pos(self.pos, self.pos + wanderForce * 5)
 			egi.green_pen()
 			egi.line_by_pos(self.pos, self.pos + flockForce * 5)
 			egi.orange_pen()
 			egi.line_by_pos(self.pos, self.pos + netForce * 5)
+			egi.red_pen()
+			egi.line_by_pos(self.pos, self.pos + wallForce * 5)
 
 
 		
@@ -339,6 +364,8 @@ class Guppy(Fish):
 		
 
 		self.super.render()
+
+		
 		
 		
 

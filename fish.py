@@ -4,15 +4,15 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 
 '''
 
-from vector2d import Vector2D
-from vector2d import Point2D
-from graphics import egi, KEY
+from vector2d import Vector2D, Point2D, Rect
+from graphics import egi
 from math import sin, cos, radians, sqrt, pi
 from random import random, randrange, uniform
 
-from transformations2d import PointToLocalSpace
+from transformations2d import *
 from geometry import *
-from path import Path
+from util import *
+# from path import Path
 
 BIG_FLOAT = float(32000)
 
@@ -38,7 +38,7 @@ class Fish(object):
 		# self.path = world.path
 		# where am i and where am i going? random
 		dir = radians(random()*360)
-		self.pos = Vector2D(uniform(0, world.width), uniform(0, world.height))
+		self.pos = world.tank.randomPosition()
 		self.vel = Vector2D()
 		self.heading = Vector2D(sin(dir),cos(dir))
 		self.side = self.heading.perp()
@@ -89,6 +89,7 @@ class Fish(object):
 
 		# Collision detection
 		self.minBoxLength = 15
+		self.tagged = False
 
 
 	
@@ -139,16 +140,24 @@ class Fish(object):
 		self.world.wrap_around(self.pos)
 
 
+	def pointsInWorldSpace(self, points, position):
+
+		return self.world.transform_points(points, position, self.heading, self.side, self.scale)
+
+
 	def drawBody(self, color=None):
 		egi.set_pen_color(name=self.color)
 
 		if(self.world.debug.drawDebug):
 			if(self.isNeighbour): 
-				egi.set_pen_color(name='BLUE')
-			elif(self.chosenOne): 
-				egi.set_pen_color(name='WHITE')
+				egi.blue_pen()
+			if(self.tagged):
+				egi.green_pen()
+			if(self.chosenOne): 
+				egi.white_pen()
 
-		pts = self.world.transform_points(self.vehicle_shape, self.renderPosition, self.heading, self.side, self.scale)
+		pts = self.pointsInWorldSpace(self.vehicle_shape, self.renderPosition)
+		# pts = self.world.transform_points(self.vehicle_shape, self.renderPosition, self.heading, self.side, self.scale)
 		# draw it!
 		egi.closed_shape(pts)
 
@@ -178,9 +187,16 @@ class Fish(object):
 		''' Draw the triangle agent with color'''
 		self.drawBody(color)
 		
-
-		if not self.world.debug.drawDebug or not self.chosenOne:
+		if(not self.world.debug.drawDebug):
 			return
+		
+		# Debug stuff to draw for all agents
+		egi.circle(self.pos, self.boundingRadius)
+
+		if not self.chosenOne:
+			return
+		# Debug stuff to only draw for one agent
+
 
 		egi.grey_pen()
 		egi.circle(self.pos, self.boundingRadius)
@@ -388,12 +404,75 @@ class Fish(object):
 	Collision forces
 	========================'''
 
-	def obstacleAvoidance(self, objs):
+	def tagObjectsInViewRange(self, objects, boxLength, boxWidth):
+
+		tagged = []
+
+		# Check each object in the list
+		for obj in objects:
+
+			if(self.chosenOne): obj.tagged = False
+
+			# Don't check outselves
+			if(obj == self):
+				continue
+
+			localPos = VectorToLocalSpace(obj.pos, self.heading, self.side)
+			radius = obj.boundingRadius + boxWidth * 0.5
+
+			
+			
+			# If it's behind us, or its x is further away than the box
+			if(localPos.x < 0 or localPos.x - radius > boxLength):
+				continue
+			
+			# So we're within the box's x range
+			# Time to check the y
+
+			# If its highest point is below the box, or its lowest point is above the box
+			if(localPos.y - radius < -boxWidth / 2 or localPos.y + radius < boxWidth/2):
+				continue
+
+			# We must have intersected the box, so tag ourselves
+			tagged.append(obj)
+
+			if(self.chosenOne): 
+				obj.tagged = True
+				egi.circle(obj.localPos, radius)
+
+
+		return tagged
+
+
+	def obstacleAvoidance(self, objects):
 		# calc a "Detection Box" length proportional to current speed
 		boxLength = self.minBoxLength + (self.speed() / self.max_speed) * self.minBoxLength
+		boxWidth = self.boundingRadius * 2
+
+		# Draw the collision box
+		if(self.chosenOne and self.world.debug.drawDebug):
+			box = Rect({
+				'left': 0, 
+				'right': boxLength, 
+				'top': boxWidth/2, 
+				'bottom': -boxWidth/2
+			})
+			boxPoints = box.getPoints()
+			print 'render points...', Util.strPoints(boxPoints)
+
+			pts = self.pointsInWorldSpace(boxPoints, self.pos)
+			print 'render points...', Util.strPoints(pts)
+			egi.red_pen()
+			egi.polyline(pts)
+			simple = [
+				Vector2D(0, 10),
+				Vector2D(10, 10),
+				Vector2D(10, -10),
+				Vector2D(0, -10)]
+			egi.polyline(self.pointsInWorldSpace(simple, self.pos))
 		
 		# note (tag) the objects in range
-		tagList = objs.TagObjectsInViewRange(self, boxLength)
+		tagList = self.tagObjectsInViewRange(objects, boxLength, boxWidth)
 		closestDistance = BIG_FLOAT # float('inf') 
 		closestObj = None
 		closestPos = None
@@ -440,47 +519,65 @@ class Fish(object):
 
 	def createFeelers(self):
 
-		
+		feelerLength = sqrt(self.boundingRadius) * 20 + 30
+		feelerAngle = pi/4
+		feelerShorter = 0.6
 
-		feelerLength = self.radius * 2
+		# Main center feeler
+		center = self.pos + self.heading.copy() * feelerLength
+		# Slightly shorter angled feelers
+		left = self.pos + self.heading.copy().rotate(feelerAngle) * feelerLength * feelerShorter
+		right = self.pos + self.heading.copy().rotate(-feelerAngle) * feelerLength * feelerShorter
 
-		ahead = self.heading.copy() * feelerLength
-		left = self.heading.get_rotated(pi/4)
-		right = self.heading.get_rotated(-pi/4)
+		feelers = [center, left, right]
 
-		feelers = [left, ahead, right]
+		if(self.world.debug.drawDebug):
+			egi.aqua_pen()
+			egi.line_by_pos(self.pos, center)
+			egi.line_by_pos(self.pos, left)
+			egi.line_by_pos(self.pos, right)
 
 		return feelers
 
 
 	def wallAvoidance(self, walls):
+
+		
+		
 		# create the feelers; centre, left and right 
 		feelers = self.createFeelers() 
+
 		distanceToClosest = BIG_FLOAT 
-		closestWall = None
+		
 		steeringForce = Vector2D() 
 		closestPoint = Vector2D()
 
 		# for each feeler, test against all walls
 		for feeler in feelers: 
+			closestWall = None
+
 			for wall in walls:
 				# do an intersection test and store the result (object)
-				result = LineIntersection(self.pos, feeler, wall.From, wall.To) 
+				result = LineIntersection2DDistPoint(self.pos, feeler, wall.start, wall.end) 
 
-				if result.Intersects:
+				if result.intersects:
+
 					# only keep the closest intersection point (IP)
-					if result.DistToIP < distanceToClosest: 
-						distanceToClosest = result.DistToIP 
+					if result.distance < distanceToClosest: 
+						distanceToClosest = result.distance 
 						closestWall = wall
 						closestPoint = result.point
 		
-		# new closest intersection point?
-		if closestWall:
-			# calculate the penetration depth for this feeler 
-			OverShoot = feeler - closestPoint
+			# new closest intersection point?
+			if closestWall:
+				# calculate the penetration depth for this feeler 
+				overshoot = (feeler - closestPoint).length()
 
-			# create force in direction of the wall normal 
-			steeringForce = closestWall.Normal * OverShoot
+				# create force in direction of the wall normal 
+				norm = closestWall.normal
+				
+				steeringForce += norm * overshoot
+
 
 		return steeringForce
 

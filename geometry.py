@@ -8,6 +8,13 @@ from vector2d import Vector2D
 from transformations2d import PointToLocalSpace
 from math import pi, sqrt, cos, sin, acos, asin
 
+class Intersection(object):
+    def __init__(self, intersects=False, distance=0.0, point=Vector2D()):
+        self.intersects = intersects
+        self.distance = distance
+        self.point = point
+
+
 #------------------------------------------------------------------------------
 def DistanceToRayPlaneIntersection(ray_origin, ray_heading, plane_point, plane_normal):
     ''' Given a plane and a ray, determine how far along the ray an 
@@ -169,7 +176,7 @@ def LineIntersection2DDistPoint(A, B, C, D):
 
     # parallel?
     if Bot == 0: 
-        return False, None, 0.0
+        return Intersection(False, None, 0.0)
 
     r = rTop / Bot;
     s = sTop / Bot;
@@ -177,10 +184,10 @@ def LineIntersection2DDistPoint(A, B, C, D):
     if  (r > 0) and (r < 1) and (s > 0) and (s < 1) :
         dist = A.distance(B) * r
         point = A + r * (B - A)
-        return True, dist, point;
+        return Intersection(True, dist, point)
 
     # fall-through - lines do not intersect
-    return False, None, 0.0;  
+    return Intersection(False, None, 0.0);
 
 #------------------------------------------------------------------------------
 def ObjectIntersection2D(obj1, obj2):

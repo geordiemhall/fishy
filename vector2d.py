@@ -21,14 +21,23 @@ def is_equal(a, b):
 #    return Point2D(v.x, v.y)
 
 class Rect(object):
-    def __init__(self, rect=DictWrap({'left': 0, 'bottom': 0, 'top': 10, 'right': 10})):
-        self.left = rect.left
-        self.top = rect.top
-        self.right = rect.right
-        self.bottom = rect.bottom
+    def __init__(self, rect={'left': 0, 'bottom': 0, 'top': 10, 'right': 10}):
+        self.left = rect['left']
+        self.top = rect['top']
+        self.right = rect['right']
+        self.bottom = rect['bottom']
 
     def getBox(self):
         return (self.left, self.top, self.right, self.bottom)
+
+    def getPoints(self):
+        return [
+            Vector2D(self.left, self.top),
+            Vector2D(self.right, self.top),
+            Vector2D(self.right, self.bottom),
+            Vector2D(self.left, self.bottom)
+        ]
+
 
 
 
