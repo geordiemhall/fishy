@@ -55,6 +55,8 @@ class Fish(object):
 		self.waypointThreshold = 50
 		self.waypointThresholdSq = self.waypointThreshold**2
 		self.fleeUrgency = 3
+
+		self.feelerPercentage = 1.0
 		
 		
 
@@ -85,11 +87,14 @@ class Fish(object):
 		self.neighbourDistance = 8 * scale
 		self.isNeighbour = False # Draw yourself a different colour cause you're a neighbour of the chosen one
 		self.neighbours = []
+		self.food = []
 
 
 		# Collision detection
 		self.minBoxLength = 15
 		self.tagged = False
+
+		self.dead = False
 
 
 	
@@ -97,7 +102,6 @@ class Fish(object):
 
 	def calculateAcceleration(self, delta):
 
-		# self.force = self.flock(delta)
 		self.force = self.wander(delta)
 
 		return self.force / self.mass
@@ -115,12 +119,28 @@ class Fish(object):
 		return vel
 
 
+	# Hook for subclasses, called after data loaded, 
+	# but before position and state are calculated
+	def performActions(self):
+		pass
+
+	def collisionDetection(self):
+		pass
+
+
 	def update(self, delta):
 
 		
 
 		# Grab our neighbours
-		self.neighbours = self.world.getNeighbours(self, self.neighbourDistance)  
+		self.neighbours = self.world.getNeighbours(self, self.neighbourDistance) 
+
+		# Grab our food
+		self.food = self.world.getFood(self)
+		
+		self.performActions()
+
+
 
 		''' update vehicle position and orientation '''
 		self.acceleration = self.calculateAcceleration(delta)
@@ -130,6 +150,8 @@ class Fish(object):
 		
 		# update position
 		self.pos += self.vel * delta
+
+		self.collisionDetection()
 
 		# update heading is non-zero velocity (moving)
 		if self.vel.lengthSq() > 0.00000001:
@@ -191,12 +213,13 @@ class Fish(object):
 			return
 		
 		# Debug stuff to draw for all agents
-		egi.circle(self.pos, self.boundingRadius)
+		
 
 		if not self.chosenOne:
 			return
 		# Debug stuff to only draw for one agent
 
+		egi.circle(self.pos, self.boundingRadius)
 
 		egi.orange_pen()
 		egi.circle(self.pos, self.boundingRadius)
@@ -297,6 +320,54 @@ class Fish(object):
 		return Vector2D(0,0)
 
 
+	def projectedPosition(self, target):
+		
+		toEvader = target.pos - self.pos
+
+		lookAheadTime = toEvader.length() / (self.maxSpeed + target.speed())
+
+		lookAheadPos = target.pos + target.vel * lookAheadTime 
+
+		return lookAheadPos
+
+
+	def pursuit(self, target): 
+
+		
+
+		projected = self.projectedPosition(target)
+
+		if(self.world.debug.drawDebug and self.chosenOne):
+			egi.red_pen()
+			egi.cross(projected, 10)
+
+		return self.seek(projected)
+		
+		# assumes that target is a Vehicle
+		# toEvader = target.pos - self.pos
+		# # relativeHeading = self.heading.dot(target.heading)
+		
+		# # simple out: if target is ahead and facing us, head straight to it
+		# # if (toEvader.dot(self.heading)>0) and (relativeHeading < 0.95): 
+		# # 	# acos(0.95)=18 degrees
+		# # 	return self.seek(target.pos)
+		
+		# # time proportional to distance, inversely proportional to sum of velocities
+		# lookAheadTime = toEvader.length() / (self.maxSpeed + target.speed())
+		
+		# # self.turnRate = 0.1
+		# # # turn rate delay? dot product = 1 if ahead, -1 if behind.
+		# # lookAheadTime += (1 - self.heading.dot(target.heading))*- self.turnRate
+		
+		# # Seek the predicted location (using look-ahead time)
+		# lookAheadPos = target.pos + target.vel * lookAheadTime 
+
+		
+			
+
+		# return self.seek(lookAheadPos)
+
+
 	def wander(self, delta):
 		''' random wandering using a projected jitter circle '''
 		wt = self.wander_target
@@ -345,7 +416,7 @@ class Fish(object):
 		separation = self.separationForce()
 		cohesion = self.cohesionForce()
 
-		if(self.world.debug.drawComponentForces):
+		if(self.chosenOne and self.world.debug.drawComponentForces):
 			s = 0.1
 			egi.green_pen()
 			egi.line_with_arrow(self.pos, self.pos + alignment * s, 10)
@@ -415,7 +486,8 @@ class Fish(object):
 
 		# Radius within which to steer away
 		DESIRED_SEPARATION = 60
-		egi.circle(self.pos, DESIRED_SEPARATION)
+		if(self.world.debug.drawDebug and self.chosenOne):
+			egi.circle(self.pos, DESIRED_SEPARATION)
 
 		for agent in self.neighbours:
 			d = self.pos.distance(agent.pos)
@@ -549,7 +621,7 @@ class Fish(object):
 			# We must have intersected the box, so tag ourselves
 			tagged.append(obj)
 
-			if(self.chosenOne): 
+			if(self.chosenOne and self.world.debug.drawDebug): 
 				obj.tagged = True
 				egi.circle(obj.localPos, radius)
 
@@ -633,6 +705,7 @@ class Fish(object):
 	def createFeelers(self):
 
 		feelerLength = sqrt(self.boundingRadius) * 20 + 30
+		feelerLength *= self.feelerPercentage
 		feelerAngle = pi/4
 		feelerShorter = 0.6
 
@@ -644,7 +717,7 @@ class Fish(object):
 
 		feelers = [center, left, right]
 
-		if(self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.debug.drawDebug):
 			egi.aqua_pen()
 			egi.line_by_pos(self.pos, center)
 			egi.line_by_pos(self.pos, left)
@@ -689,10 +762,51 @@ class Fish(object):
 				# create force in direction of the wall normal 
 				norm = closestWall.normal
 				
-				steeringForce += norm * overshoot
+				steeringForce += norm * overshoot 
 
 
 		return steeringForce
+
+
+
+	def hide(self):
+
+	    hidingPlaces = []
+
+	    for hunter in self.world.hunters:
+	        for obstacle in self.world.obstacles:
+	            dir = hunter.pos.distanceTo(obstacle.pos).get_normalised()
+	            length = hunter.pos.distance(obstacle.pos) + obstacle.radius + self.scale.x * 1.5
+	            
+	            place = hunter.pos + dir * length
+
+	            hidingPlaces.append(place)
+
+	    self.hidingPlaces = hidingPlaces
+	    self.bestPlace = self.bestHidingPlace(hidingPlaces, self.world.hunters[0])
+
+	    # print 'bestPlace', self.bestPlace
+
+	    # seek = self.seek(self.bestPlace)
+	    arrive = self.arrive(self.bestPlace, 'normal')
+
+	    return arrive
+
+
+
+	def bestHidingPlace(self, hidingPlaces, hunter):
+
+	    closestPlaces = sorted(hidingPlaces, key=lambda p: p.distance(self.pos))
+	    
+	    safePlaces = filter(lambda p: p.distance(hunter.pos) > hunter.threatRadius, closestPlaces)        
+
+	    if(len(safePlaces)):
+	        return safePlaces[0]
+
+	    # If all hiding places are within range, then just pick the furthest
+	    return max(hidingPlaces, key=lambda p: p.distance(hunter.pos))
+
+
 
 
 	

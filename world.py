@@ -7,6 +7,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 from vector2d import Vector2D, Rect
 from matrix33 import Matrix33
 from graphics import *
+from pyglet import clock
 
 from fish import Fish
 from util import DictWrap
@@ -15,6 +16,7 @@ from guppy import Guppy
 from util import Util
 from tank import Tank
 from food import Food
+from random import uniform
 
 
 class World(object):
@@ -49,13 +51,28 @@ class World(object):
 
 
 
+        
+
+
+
     def makeFish(self):        
-        self.agents = []
+        self.fishes = []
+
 
     
     def makeFood(self):
         self.food = []
         self.foodDistance = 30
+        self.autoFeed = True
+        self.autoFeedAboveInterval = 2    # seconds
+        self.autoFeedBelowInterval = 1    # seconds
+        self.sicknessEnabled = True
+        self.sicknessInterval = 0.1
+
+        
+        clock.schedule_interval(self.autoAddFoodAbove, self.autoFeedAboveInterval)
+        clock.schedule_interval(self.autoAddFoodBelow, self.autoFeedBelowInterval)
+        clock.schedule_interval(self.makeFishSicker, self.sicknessInterval)
 
 
     def makeTank(self):
@@ -63,19 +80,25 @@ class World(object):
         self.tank = Tank(world=self)
         print 'after make tank'
 
-    def addFood(self, x, num = 1):
+    def addFood(self, x, y=None, num = 1):
+
+        # If no y was given then use the standard food distance above the tank
+        if(y is None):
+            y = self.height - self.foodDistance
+        else:
+            y = Util.clamp(self.tank.box.bottom, y, self.height)
+
+        # Make sure the food will go in the tank
+        x = Util.clamp(self.tank.box.left, x, self.tank.box.right)
+
+        # Add the foods
         for _ in range(num):
             newFood = Food(world=self)
-            newFood.pos = Vector2D(x, self.height - self.foodDistance)
+            newFood.pos = Vector2D(x, y)
             self.food.append(newFood)
 
 
-    def update(self, delta):
-
-        if not self.paused:
-            self._clock += delta
-            [a.update(delta) for a in self.agents]
-            [a.update(delta) for a in self.food]
+    
            
 
 
@@ -109,6 +132,71 @@ class World(object):
 
 
 
+    '''
+
+    Updating
+    =================================='''
+
+    def update(self, delta):
+        self.lastDelta = delta
+
+        if not self.paused:
+            self._clock += delta
+
+            self.fishes[0].chosenOne = True
+
+            self.livingFishes = [f for f in self.fishes if not f.dead]
+            [f.update(delta) for f in self.fishes]
+            [f.update(delta) for f in self.food if not f.eaten]
+
+            # Kill dead fishes
+            self.fishes = [f for f in self.fishes if not (f.dead and f.pos.y < self.tank.box.bottom + 5)]
+
+            # Remove food that's off the screen
+            self.food = [f for f in self.food if not f.eaten]
+
+
+            
+    def makeFishSicker(self, dt=0):
+        # Make sure sickness is enabled
+        if(not self.sicknessEnabled): return
+
+        [f.sicker() for f in self.fishes]
+        # clock.schedule_once(self.makeFishSicker, self.sicknessInterval)
+
+
+    def autoAddFoodAbove(self, dt=0):
+        self.autoAddFood(above=True)
+        # clock.schedule_once(self.autoAddFoodAbove, self.autoFeedAboveInterval)
+
+    def autoAddFoodBelow(self, dt=0):
+        self.autoAddFood(above=False)
+        self.autoAddFood(above=False)
+        # clock.schedule_once(self.autoAddFoodBelow, self.autoFeedBelowInterval)
+
+
+    def autoAddFood(self, above = True):
+
+        # Make sure auto food is enabled
+        if(not self.autoFeed): return
+
+        position = self.tank.randomPosition()
+
+        # Add the food
+        if(above):
+            self.addFood(x = position.x)
+        else:
+            self.addFood(x = position.x, y = position.y)
+
+
+        
+
+
+
+
+
+
+
     ''' 
     
     Rendering 
@@ -121,46 +209,15 @@ class World(object):
         # Draw tank first
         self.tank.render()
 
-        # Then agents
-        [a.render() for a in self.agents]
+        # Then fish
+        [f.render() for f in self.fishes]
 
         # Food
-        [a.render() for a in self.food]
-
-        # And finally info text
-        if self.debug.showInfo:
-            self.drawInfo()
+        [f.render() for f in self.food if not f.eaten]
 
         
+
         
-
-
-    def drawInfo(self):
-
-
-        lineHeight = 20
-        offset = (20, 50)
-
-
-        # Draw non-info text
-        egi.text_color(name='WHITE')
-        
-
-        for i, inf in enumerate(self.debug.otherInfo):
-            egi.text_at_pos(offset[0], offset[1] + i * lineHeight, inf)
-            
-        
-
-        offset = (20, 30)
-        i = 0
-        for p in self.info:
-            egi.text_color(name='GREY')
-            egi.text_at_pos(offset[0] + 0, self.height - (offset[1] + i * lineHeight), p[0])
-            egi.text_color(name='WHITE')
-            egi.text_at_pos(offset[0] + 50, self.height - (offset[1] + i * lineHeight), p[1])
-            egi.text_color(name='ORANGE')
-            egi.text_at_pos(offset[0] + 200, self.height - (offset[1] + i * lineHeight), p[2])
-            i += 1
 
 
 
@@ -176,15 +233,24 @@ class World(object):
     World logic 
     =================================='''
 
-    def addAgent(self, num=1):
+    def addFish(self, num=1):
+        if(num < 1): return
+
+        newFishes = []
         for _ in xrange(num):
-            newAgent = Guppy(world=self, scale=10)
-            self.agents.append(newAgent)
+            newFish = Guppy(world=self, scale=10)
+            self.fishes.append(newFish)
+            newFishes.append(newFish)
+
+        # if(num == 1)
+        #     return newFishes[0]
+
+        return newFishes
 
 
     def randomizePath(self):
         self.path.create_random_path(8, self.width/6, self.height/6, self.width*2/3 + self.width/6, self.height*2/3 + self.height/6)
-        for agent in self.agents:
+        for agent in self.fishes:
                 agent.path = self.path
 
 
@@ -193,19 +259,15 @@ class World(object):
 
     def getNeighbours(self, agent, distance=100):
 
-        arr = []
         distanceSq = distance**2
 
-        for other in self.agents:
-            if(agent.chosenOne): 
-                other.isNeighbour = False
-            if(other != agent and other.pos.distanceSq(agent.pos) < distanceSq):
-                arr.append(other)
-                if(agent.chosenOne): 
-                    other.isNeighbour = True
+        return [a for a in self.fishes if a != agent and a.pos.distanceSq(agent.pos) < distanceSq]
 
-        return arr
 
+    def getFood(self, agent, distance=10000):
+
+
+        return [f for f in self.food if not f.eaten and self.tank.contains(f.pos)]
 
 
 
@@ -302,15 +364,8 @@ class World(object):
 
         self.debug = DictWrap({
             'showInfo': False,
-            'drawDebug': True,
-            'drawComponentForces': False,
-            'otherInfo': [
-                'I = Toggle info (reduces lag)',
-                'U = Toggle debug drawings',
-                'Y = Toggle draw component forces',
-                'P = Pause',
-                'A = Add agent'
-            ]
+            'drawDebug': False,
+            'drawComponentForces': False
         })
 
         self.params = [
@@ -370,7 +425,7 @@ class World(object):
 
     def syncParams(self):
         for param in self.params:
-            self.updateAgentParam(param['name'], param['value'])
+            self.updateFishParam(param['name'], param['value'])
 
 
 
@@ -389,16 +444,16 @@ class World(object):
 
             if(symbol == codes[0]):
                 param['value'] *= (1 - param['increment'])
-                self.updateAgentParam(param['name'], param['value'])
+                self.updateFishParam(param['name'], param['value'])
             elif(symbol == codes[1]):
                 param['value'] *= (1 + param['increment'])
-                self.updateAgentParam(param['name'], param['value'])
+                self.updateFishParam(param['name'], param['value'])
             
 
 
     # Might be easier to just make agents look this up from the world...
-    def updateAgentParam(self, param, value):
+    def updateFishParam(self, param, value):
         print 'Update parameter:', param, '=>', value
         self.generateInfo()
-        for agent in self.agents:
+        for agent in self.fishes:
             agent.__setattr__(param, value)

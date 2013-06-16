@@ -1,4 +1,4 @@
-'''Autonomous Agent Movement: Seek, Arrive and Flee
+'''Autonomous Fish Movement: Seek, Arrive and Flee
 
 Created for HIT3046 AI for Games, Lab 03
 By Clinton Woodward cwoodward@swin.edu.au
@@ -32,9 +32,10 @@ from graphics import egi, KEY, rgba
 from pyglet import window, clock
 from pyglet.gl import *
 
-from vector2d import Vector2D
 from world import World
 
+def toggle(variable):
+    variable = not variable
 
 class Game(object):
     """The main game object"""
@@ -85,6 +86,44 @@ class Game(object):
         self.win.push_handlers(self.on_mouse_press)
         self.win.push_handlers(self.on_resize)
 
+        
+
+
+        self.showInfo = True
+        self.info = {
+            'I': {
+                'label': 'Toggle Info (reduces lag)',
+                'enabled': True
+            },
+            'R': {
+                'label': 'Reset World'
+            },
+            'C' : {
+                'label': 'Toggle Circle of Life (and death)',
+                'enabled': True
+            },
+            'U': {
+                'label': 'Toggle Debug drawings',
+                'enabled': False
+            },
+            'F': {
+                'label': 'Toggle Draw flocking forces',
+                'enabled': False
+            },
+            'P': {
+                'label': 'Pause',
+                'enabled': False
+            },
+            'A': {
+                'label': 'Add fish'
+            },
+            'LMB': {
+                'label': 'Add food'
+            }
+        }
+
+        
+
 
 
 
@@ -93,18 +132,23 @@ class Game(object):
     def resetWorld(self):
 
 
-        # create a world for agents
+        # create a world for fishes
         self.world = World(self.width, self.height)
         
 
-        # add agents
-        numAgents = 5
-        self.world.addAgent(numAgents)
-        self.world.agents[0].chosenOne = True
+        # add fishes
+        numFishes = 5
+        self.world.addFish(numFishes)
 
 
         # unpause the world, ready for movement
-        self.world.paused = False
+        # self.world.paused = False
+
+        self.world.paused = self.info['P']['enabled']
+        self.world.debug.drawComponentForces = self.info['F']['enabled']
+        self.world.debug.drawDebug = self.info['U']['enabled']
+        self.world.autoFeed = self.info['C']['enabled']
+        self.world.sicknessEnabled = self.info['C']['enabled']
 
 
 
@@ -127,7 +171,6 @@ class Game(object):
             # done in update() will still appear above the bg
             self.renderBackground()
 
-            
 
             # Update and render the world
             delta = clock.tick()
@@ -136,6 +179,9 @@ class Game(object):
 
             # show nice FPS top left
             self.fps_display.draw()
+
+            # Draw our instructions
+            self.drawInfo()
 
             
             
@@ -151,49 +197,99 @@ class Game(object):
 
     def on_mouse_press(self, x, y, button, modifiers):
         if button == 1: # left
-            self.world.addFood(x=x)
+            self.world.addFood(x=x, y=y)
+
+
+    def toggleInfo(self, key):
+        self.info[key]['enabled'] = not self.info[key]['enabled']
 
     def on_key_press(self, symbol, modifiers):
 
         if symbol == KEY.P:
             self.world.paused = not self.world.paused
+            self.toggleInfo('P')
 
-
-
-
-        # elif symbol in AGENT_MODES:
-        #     for agent in self.world.agents:
-        #         agent.mode = AGENT_MODES[symbol]
         elif symbol == KEY.A:
             # Add an another agent when A is pressed
-            self.world.addAgent()
-            # self.world.syncParams()
+            self.world.addFish()
 
         elif symbol == KEY.I:
-            self.world.debug.showInfo = not self.world.debug.showInfo
+            self.showInfo = not self.showInfo
+            self.toggleInfo('I')
+
+        elif symbol == KEY.R:
+            self.resetWorld()
+            
 
         elif symbol == KEY.U:
             self.world.debug.drawDebug = not self.world.debug.drawDebug
+            self.toggleInfo('U')
 
-        elif symbol == KEY.Y:
+        elif symbol == KEY.F:
             self.world.debug.drawComponentForces = not self.world.debug.drawComponentForces
+            self.toggleInfo('F')
 
-        elif symbol == KEY.LEFT:
-            for agent in self.world.agents:
-                agent.size -= 1
-                agent.updateStats()
-        elif symbol == KEY.RIGHT:
-            for agent in self.world.agents:
-                agent.size += 1
-                agent.updateStats()
+        elif symbol == KEY.C:
+            print 'print circle'
+            self.world.autoFeed = not self.world.autoFeed
+            self.world.sicknessEnabled = not self.world.sicknessEnabled
+            self.toggleInfo('C')
+            
 
-        else:
-            self.world.keyPressed(symbol, modifiers)
+        # elif symbol == KEY.LEFT:
+        #     for agent in self.world.fishes:
+        #         agent.size -= 1
+        #         agent.updateStats()
+
+        # elif symbol == KEY.RIGHT:
+        #     for agent in self.world.fishes:
+        #         agent.size += 1
+        #         agent.updateStats()
+
+        # else:
+        #     self.world.keyPressed(symbol, modifiers)
 
 
 
+    def drawInfo(self):
+        
+        if not self.showInfo: return
+            
+
+        lineHeight = 24
+        offset = (33, 30)
 
 
+        # Draw non-info text
+        egi.text_color(name='WHITE')
+        
+        i = 0
+        for key, value in self.info.iteritems():
+            # draw the key
+            egi.text_color(name='GREY')
+            egi.text_at_pos(offset[0] + 0, (offset[1] + i * lineHeight), key)
+
+            # draw the label
+            egi.text_color(name='WHITE')
+            if('enabled' in value and value['enabled']):
+                egi.text_color(name='GREEN')
+            egi.text_at_pos(offset[0] + 50, (offset[1] + i * lineHeight), value['label'])
+            # egi.text_at_pos(offset[0], offset[1] + i * lineHeight, inf)
+
+            i += 1
+            
+        
+
+        # offset = (20, 30)
+        # i = 0
+        # for key, value in self.info.iteritems():
+        #     egi.text_color(name='GREY')
+        #     egi.text_at_pos(offset[0] + 0, self.height - (offset[1] + i * lineHeight), p[0])
+        #     egi.text_color(name='WHITE')
+        #     egi.text_at_pos(offset[0] + 50, self.height - (offset[1] + i * lineHeight), p[1])
+        #     # egi.text_color(name='ORANGE')
+        #     # egi.text_at_pos(offset[0] + 200, self.height - (offset[1] + i * lineHeight), p[2])
+        #     i += 1
 
 
 

@@ -21,7 +21,7 @@ class Tank(object):
 		self.water = ('27c8f0', '1fa3ff', '0069d5')
 
 		# Don't let fish spawn within this far of the edge
-		self.padding = 50
+		self.padding = 0.08
 
 		m = 20
 		self.margin = DictWrap({
@@ -36,33 +36,41 @@ class Tank(object):
 		
 
 	def randomPosition(self):
-		p = self.padding
-		b = self.box
-		s = self.size
-		return Vector2D(uniform(b.left + p, b.left + s.width - p), uniform(b.bottom + p, b.bottom + s.height - p))
+		pb = self.paddedBox
+		return Vector2D(uniform(pb.left, pb.right), uniform(pb.bottom, pb.top))
 		
 
 	def resize(self):
 		m = self.margin
+		V = Vector2D
 
-		bounds = {
+		self.box = b = Rect({
 			'left': m.left,
 			'top': self.world.height - m.top,
 			'right': self.world.width - m.right,
 			'bottom': m.bottom
-		}
+		})
 
-		self.box = Rect(bounds)
-
+		# Set up the size
 		self.size = DictWrap({
 			'width': self.box.right - self.box.left,
 			'height': self.box.top - self.box.bottom
 		})
 
+		# Make the padded box
+		p = (self.size.width * self.padding, self.size.height * self.padding)
+
+		self.paddedBox = Rect({
+			'left': self.box.left + p[0],
+			'top': self.box.top - p[0],
+			'right': self.box.right - p[1],
+			'bottom': self.box.bottom + p[1]
+		})
+
+		# Get the wall segments for rendering and collisions
 		self.walls = self.getWalls()
 
-		V = Vector2D
-		b = self.box
+		# Create the shape pusing the walls
 		waveHeight = 40
 		self.tankShape = [
 			V(b.left, b.top + waveHeight),
@@ -171,7 +179,10 @@ class Tank(object):
 
 		egi.unclosed_shape(self.tankShape)
 
-		
+	def contains(self, point):
+		b = self.box
+		return point.x >= b.left and point.x <= b.right and point.y <= b.top and point.y >= b.bottom
+
 		
 
 

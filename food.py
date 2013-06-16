@@ -6,6 +6,7 @@ Food
 from vector2d import Vector2D
 from graphics import egi, rgba
 from random import uniform
+from math import sqrt, sin
 
 
 class Food(object):
@@ -18,10 +19,14 @@ class Food(object):
 		self.vel = Vector2D()
 
 		self.maxAirSpeed = 500
-		self.maxWaterSpeed = 50
-		self.radius = uniform(5, 10)
+		self.maxWaterSpeed = 40
+		self.radius = uniform(3, 7)
 
-		self.color = rgba('ecc200')
+		self.color = rgba('fff')
+		self.eaten = False
+
+		self.heading = Vector2D(0, 1)
+		self.side = self.heading.perp()
 
 
 	def calculateAcceleration(self, delta):
@@ -61,5 +66,23 @@ class Food(object):
 
 	def render(self):
 		egi.set_pen_color(self.color)
-		egi.circle(self.pos, self.radius)
+
+		frequency = 5
+		pulse = sin(self.world._clock * frequency)
+
+		range = 0.2
+		pulse = 1 + (pulse * range) 
+		r = self.radius * pulse
+		
+		egi.circle(self.pos, r, filled=True)
+
+	def speed(self):
+		return self.vel.length()
+
+	def speedSqrt(self):
+		return sqrt(self.speed())
+
+
+
+
 		

@@ -85,7 +85,7 @@ class EasyGraphics(object):
         self.set_stroke(self.stroke)
         self.window = window
         # prep the text object
-        self.text = font.Text(font.load('',10), '', color=(1,1,1,1),
+        self.text = font.Text(font.load('Proxima Nova',12), '', color=(1,1,1,1),
                               valign='bottom', halign='left')
         # prep the quadric object used by glu* functions (circle)
         # styles GLU_LINE, GLU_FILL, GLU_SILHOUETTE, GLU_POINT

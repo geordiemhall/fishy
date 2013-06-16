@@ -109,8 +109,7 @@ class Vector2D(object):
     def get_normalised(self):
         ''' return a normalised copy of self '''
         result = self.copy()
-        result.normalise()
-        return result
+        return result.normalise()
 
     def dot(self, v2):
         ''' The dot (inner) product of self and v2 vector '''
@@ -204,6 +203,8 @@ class Vector2D(object):
 
     def tuple(self):
         return (self.x, self.y)
+
+
 
     def __neg__(self): #
         ''' get_reverse(), but using - operator based instead. '''
