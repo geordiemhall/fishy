@@ -6,7 +6,7 @@ Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
 
 from vector2d import Vector2D
 from transformations2d import PointToLocalSpace
-from math import pi, sqrt, cos, sin, acos, asin
+from math import pi, sqrt, sin, acos
 
 class Intersection(object):
     def __init__(self, intersects=False, distance=0.0, point=Vector2D()):

@@ -17,6 +17,7 @@ from math import cos, sin, pi
 
 KEY = window.key # the key codes
 
+# Some preset colors
 COLOR_NAMES = { 'BLACK':  (0.0, 0.0, 0.0, 1),
                 'WHITE':  (1.0, 1.0, 1.0, 1),
                 'RED':    (1.0, 0.0, 0.0, 1),
@@ -34,6 +35,11 @@ COLOR_NAMES = { 'BLACK':  (0.0, 0.0, 0.0, 1),
                 'LIGHT_GREY': (0.8, 0.8, 0.8, 1),
                 'LIGHT_PINK': (1.0, 0.9, 0.9, 1)
                 }
+
+
+'''
+Color conversion
+'''
 
 HEX = '0123456789abcdef'
 HEX2 = dict((a+b, HEX.index(a)*16 + HEX.index(b)) for a in HEX for b in HEX)
@@ -61,17 +67,9 @@ def rgba(hex, alpha = 1):
     return (val[0], val[1], val[2], alpha)
 
 
-print rgb('aabbcc')
-# (170, 187, 204)
-print hex((170, 187, 204))
-# aabbcc
-print rgb('aa0200')
-# (170, 2, 0)
-print hex((170, 2, 0))
-# aa0200
-
-print rgba('ff0000', 0.8)
-
+'''
+Simple graphics interface
+'''
 class EasyGraphics(object):
 
     def __init__(self):
@@ -122,6 +120,8 @@ class EasyGraphics(object):
         glVertex2f(x2, y2)
         glEnd()
 
+
+    ''' I added this function to draw unclosed lines cause the others didn't work '''
     def unclosed_shape(self, points):
         if(len(points) < 2): return
 

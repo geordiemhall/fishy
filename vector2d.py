@@ -5,8 +5,7 @@ Updated by Steve Dower
 '''
 
 from math import sqrt, cos, sin, acos, asin, tan, atan
-from util import DictWrap
-from point2d import Point2D
+from random import uniform
 
 MIN_FLOAT = 1e-300
 
@@ -258,3 +257,7 @@ class Vector2D(object):
 
     def __str__(self):
         return '(%7.2f, %7.2f)' % (self.x, self.y)
+
+    @staticmethod
+    def random(magnitude=1):
+        return Vector2D(uniform(0, 1), uniform(0, 1)).normalise() * magnitude

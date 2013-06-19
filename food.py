@@ -3,14 +3,19 @@
 Food 
 =================================='''
 
+# Vendor imports
 from vector2d import Vector2D
 from graphics import egi, rgba
 from random import uniform
 from math import sqrt, sin
 
 
+"""
+Simple Food object with different physics if outside the tank
+
+"""
 class Food(object):
-	"""Food object"""
+	
 	def __init__(self, world=None):
 		
 		self.world = world
@@ -20,9 +25,9 @@ class Food(object):
 
 		self.maxAirSpeed = 500
 		self.maxWaterSpeed = 40
-		self.radius = uniform(3, 7)
+		self.boundingRadius = uniform(3, 7)
 
-		self.color = rgba('fff')
+		self.color = rgba('ffe400')
 		self.eaten = False
 
 		self.heading = Vector2D(0, 1)
@@ -47,7 +52,7 @@ class Food(object):
 		vel.truncate(max)
 
 		return vel
-
+		
 
 	def update(self, delta):
 		''' update vehicle position and orientation '''
@@ -64,6 +69,7 @@ class Food(object):
 			self.heading = self.vel.get_normalised()
 			self.side = self.heading.perp()
 
+
 	def render(self):
 		egi.set_pen_color(self.color)
 
@@ -72,12 +78,14 @@ class Food(object):
 
 		range = 0.2
 		pulse = 1 + (pulse * range) 
-		r = self.radius * pulse
+		r = self.boundingRadius * pulse
 		
 		egi.circle(self.pos, r, filled=True)
 
+
 	def speed(self):
 		return self.vel.length()
+
 
 	def speedSqrt(self):
 		return sqrt(self.speed())

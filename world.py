@@ -12,6 +12,8 @@ from pyglet import clock
 from fish import Fish
 from util import DictWrap
 from path import Path
+from hunter import Hunter
+from rock import Rock
 from guppy import Guppy
 from util import Util
 from tank import Tank
@@ -38,20 +40,26 @@ class World(object):
         
         self.scale = 10
         self.gravity = Vector2D(0, -900)
-        # self.path = Path(maxx=width, maxy=height, num_pts=5)
         
 
         self.makeTank()
-        print 'before make fish'
+        
         self.makeFish()
-        print 'after make fish'
+
         self.makeDebug()
 
         self.makeFood()
 
+        self.makeObstacles()
+
+        self.makeHunters()
 
 
-        
+
+    '''
+
+    Setup methods
+    =================================='''
 
 
 
@@ -78,7 +86,29 @@ class World(object):
     def makeTank(self):
 
         self.tank = Tank(world=self)
-        print 'after make tank'
+
+
+    def makeObstacles(self):
+
+        self.obstacles = []
+
+        self.addRocks(10)
+
+
+
+    def makeHunters(self):
+
+        self.hunters = []
+
+        self.addHunters()
+
+
+    '''
+
+    'Add' methods
+    =================================='''
+
+
 
     def addFood(self, x, y=None, num = 1):
 
@@ -98,81 +128,36 @@ class World(object):
             self.food.append(newFood)
 
 
-    
-           
+    def obstacleOverlapsOtherObstacles(self, obstacle):
+        breathingSpace = 20
+        for o in self.obstacles:
+            if(o.pos.distance(obstacle.pos) - obstacle.boundingRadius - o.boundingRadius < breathingSpace):
+                return True
+        return False
 
 
-    def generateInfo(self):
-        arr = []
+    def addRocks(self, num=10):
 
-        for param in self.params:
-            label = param['name'] + ':'
-            keys = str(param['keys']).replace('\'', '')
-            val =  str(param['value'])
-
-            arr.append((keys, label, val))
-
-        self.info = arr
-
-    def logInfo(self):
-        print "\n\nFinal parameter values:\n"
-        for p in self.info:
-            print p[1], p[2]
-
-
-
-
-    def resize(self, width, height):
-        self.width = width
-        self.height = height
-        self.center = Vector2D(width/2, height/2)
-
-        self.tank.resize()
-
-
-
-
-    '''
-
-    Updating
-    =================================='''
-
-    def update(self, delta):
-        self.lastDelta = delta
-
-        if not self.paused:
-            self._clock += delta
-
-            self.fishes[0].chosenOne = True
-
-            self.livingFishes = [f for f in self.fishes if not f.dead]
-            [f.update(delta) for f in self.fishes]
-            [f.update(delta) for f in self.food if not f.eaten]
-
-            # Kill dead fishes
-            self.fishes = [f for f in self.fishes if not (f.dead and f.pos.y < self.tank.box.bottom + 5)]
-
-            # Remove food that's off the screen
-            self.food = [f for f in self.food if not f.eaten]
-
-
+        for i in range(num):
+            newRock = Rock(world=self)
             
-    def makeFishSicker(self, dt=0):
-        # Make sure sickness is enabled
-        if(not self.sicknessEnabled): return
+            newRock.vel = Vector2D.random(newRock.maxSpeed)
+            newRock.vel.y = 0
 
-        [f.sicker() for f in self.fishes]
-        # clock.schedule_once(self.makeFishSicker, self.sicknessInterval)
+            newRock.pos = self.tank.randomPosition()
+            while(self.obstacleOverlapsOtherObstacles(newRock)):
+                newRock.pos = self.tank.randomPosition()
 
+            self.obstacles.append(newRock)
+           
 
     def autoAddFoodAbove(self, dt=0):
         self.autoAddFood(above=True)
-        # clock.schedule_once(self.autoAddFoodAbove, self.autoFeedAboveInterval)
+
 
     def autoAddFoodBelow(self, dt=0):
         self.autoAddFood(above=False)
         self.autoAddFood(above=False)
-        # clock.schedule_once(self.autoAddFoodBelow, self.autoFeedBelowInterval)
 
 
     def autoAddFood(self, above = True):
@@ -189,10 +174,64 @@ class World(object):
             self.addFood(x = position.x, y = position.y)
 
 
+    def addHunters(self, num=1):
         
+        # Add the foods
+        for _ in range(num):
+            newHunter = Hunter(world=self)
+            newHunter.pos = self.tank.randomPosition()
+            self.hunters.append(newHunter)
 
 
 
+
+    '''
+
+    Updating
+    =================================='''
+
+    def update(self, delta, forced=False):
+        
+        self.lastDelta = delta
+
+        if not self.paused or forced:
+            self._clock += delta
+
+            # Debug fish
+            if(len(self.fishes)): self.fishes[0].chosenOne = True
+            if(len(self.hunters)): self.hunters[0].chosenOne = True
+
+            # Keep list of living fish for food calculatinons
+            self.livingFishes = [f for f in self.fishes if not f.dead]
+
+            # TODO: Calculate fish times/distances from foods for everything so it isn't
+            #       recalculated by every fish * food
+            # self.calculateFoodData()
+
+            # Updates
+            [f.update(delta) for f in self.fishes]
+            [f.update(delta) for f in self.food if not f.eaten]
+            [o.update(delta) for o in self.obstacles]
+            [h.update(delta) for h in self.hunters]
+
+
+
+
+            # Kill dead fishes
+            self.fishes = [f for f in self.fishes if not (f.dead and f.pos.y < self.tank.box.bottom - 50)]
+
+            # Remove food that's off the screen
+            self.food = [f for f in self.food if not f.eaten]
+
+
+    def makeFishSicker(self, dt=0):
+        # Make sure sickness is enabled
+        if(not self.sicknessEnabled): return
+
+        [f.sicker() for f in self.fishes]    
+
+
+    
 
 
 
@@ -203,8 +242,6 @@ class World(object):
     =================================='''
 
     def render(self):
-        
-        
 
         # Draw tank first
         self.tank.render()
@@ -214,6 +251,14 @@ class World(object):
 
         # Food
         [f.render() for f in self.food if not f.eaten]
+
+        # Rocks
+        [o.render() for o in self.obstacles]
+
+        # Hunters
+        [h.render() for h in self.hunters]
+
+        
 
         
 
@@ -232,6 +277,15 @@ class World(object):
     
     World logic 
     =================================='''
+
+
+    def resize(self, width, height):
+        self.width = width
+        self.height = height
+        self.center = Vector2D(width/2, height/2)
+
+        self.tank.resize()
+
 
     def addFish(self, num=1):
         if(num < 1): return
@@ -266,10 +320,18 @@ class World(object):
 
     def getFood(self, agent, distance=10000):
 
-
         return [f for f in self.food if not f.eaten and self.tank.contains(f.pos)]
 
 
+    # Enables/disables the circle of life properties
+    @property
+    def lionKing(self):
+        return self.autoFeed # same value for both, so just pick this one
+
+    @lionKing.setter
+    def lionKing(self, value):
+        self.autoFeed = value
+        self.sicknessEnabled = value
 
 
 
@@ -282,7 +344,7 @@ class World(object):
 
     Util 
     =================================='''
-    
+
 
     def wrap_around(self, pos):
         ''' Treat world as a toroidal space. Updates parameter object pos '''
@@ -353,107 +415,14 @@ class World(object):
 
     ''' 
     
-    Debug code 
+    Debug variables
     =================================='''
 
     def makeDebug(self):
+
+        self.paused = False
+        self.drawDebug = False,
+        self.drawComponentForces = False
+        self.drawHidingSpots = False
+        self.awokenHunter = True
         
-        
-
-        self.paused = True
-
-        self.debug = DictWrap({
-            'showInfo': False,
-            'drawDebug': False,
-            'drawComponentForces': False
-        })
-
-        self.params = [
-            # {
-            #     'name': 'wanderDistance',
-            #     'keys': ('N', 'M'),
-            #     'value': 2.4 * self.scale,
-            #     'increment': 0.1
-            # },
-            {
-                'name': 'wander_radius',
-                'keys': ('V', 'B'),
-                'value': 0.8 * self.scale,
-                'increment': 0.1
-            },
-            {
-                'name': 'wander_jitter',
-                'keys': ('X', 'C'),
-                'value': 8.5 * self.scale,
-                'increment': 0.1
-            },
-            # {
-            #     'name': 'wanderInfluence',
-            #     'keys': ('F', 'G'),
-            #     'value': 13.0,
-            #     'increment': 0.1
-            # },
-            # {
-            #     'name': 'neighbourDistance',
-            #     'keys': ('W', 'E'),
-            #     'value': 13.0 * self.scale,
-            #     'increment': 0.1
-            # },
-            {
-                'name': 'alignmentInfluence',
-                'keys': ('K', 'L'),
-                'value': 5,
-                'increment': 0.1
-            },
-            {
-                'name': 'separationInfluence',
-                'keys': ('H', 'J'),
-                'value': 400.0,
-                'increment': 0.1
-            },
-            {
-                'name': 'cohesionInfluence',
-                'keys': ('S', 'D'),
-                'value': 3.4,
-                'increment': 0.1
-            }
-        ]
-
-        self.params = []
-
-        self.generateInfo()
-
-    def syncParams(self):
-        for param in self.params:
-            self.updateFishParam(param['name'], param['value'])
-
-
-
-
-    def keyPressed(self, symbol, modifiers):
-        # Checks if any parameters' keys were pressed
-        
-        for param in self.params:
-            keys = param['keys']
-            codes = (getattr(KEY, keys[0]), getattr(KEY, keys[1]))
-            
-
-            # If we were pressed, then change the value
-            # Only update the parameter that was changed
-            # Might need to optimise this further
-
-            if(symbol == codes[0]):
-                param['value'] *= (1 - param['increment'])
-                self.updateFishParam(param['name'], param['value'])
-            elif(symbol == codes[1]):
-                param['value'] *= (1 + param['increment'])
-                self.updateFishParam(param['name'], param['value'])
-            
-
-
-    # Might be easier to just make agents look this up from the world...
-    def updateFishParam(self, param, value):
-        print 'Update parameter:', param, '=>', value
-        self.generateInfo()
-        for agent in self.fishes:
-            agent.__setattr__(param, value)

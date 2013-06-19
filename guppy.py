@@ -2,27 +2,29 @@
 Guppy
 '''
 
-from fish import Fish
-from vector2d import Vector2D
-from graphics import egi, KEY, COLOR_NAMES, rgba
-from math import sin, cos, radians, sqrt, pi
-from random import random, randrange, uniform
+# Vendor imports
+
+from math import sin, cos, sqrt, pi
+from random import uniform, choice
 from matrix33 import Matrix33
-
-import copy
-
-
+from graphics import egi, rgba
+from copy import deepcopy
 from util import Util, DictWrap
+from vector2d import Vector2D
 
-from path import Path
+# Our imports
+
+from fish import Fish
+
+
 
 class Guppy(Fish):
-	def __init__(self, world=None, scale=30.0, mass=1.0, mode='wander'):
+	def __init__(self, world=None, scale=30.0, mass=1.0):
 
 		self.super = super(Guppy, self)
-		self.super.__init__(world=world, scale=scale, mass=mass, mode=mode)
+		self.super.__init__(world=world, scale=scale, mass=mass)
 
-		print 'Guppy init'
+		print 'Guppy, ' + choice(['I choose you!', 'get out there!', 'do your thang!', 'swim allll up in this!', 'not splash again!', 'evolve already! God.'])
 
 		# Set up some rendering properties
 
@@ -38,11 +40,12 @@ class Guppy(Fish):
 		
 		self._sicknessDomain = (0.0, 100.0)
 		self._sickness = self._sicknessDomain[0]
-		self._sickness = 0
+		# self._sickness = 0
 		self.sicknessRate = 1
 
 		self.varyVelocity = False
 		self.feedRadius = 20
+		self.food = []
 		self.isParent = False
 
 		self.recalculateColor()
@@ -53,12 +56,12 @@ class Guppy(Fish):
 
 		self._sizes = (0.0, 20.0)
 		self._stats = DictWrap({
-			'body': (0.7, 4.0),
-			'mass': (0.8, 1.5),
+			'body': (0.7, 2.0),
+			'mass': (1.2, 1.5),
 			'speed': (200, 100),
-			'flockingInfluence': (0.2, 0),
-			'wanderDistance': (30, 50),
-			'wanderRadius': (0.6 * self.scaleValue, 2.4 * self.scaleValue),
+			'flockingInfluence': (0.25, 0),
+			'wanderDistance': (40, 50),
+			'wanderRadius': (2.2 * self.scaleValue, 2.4 * self.scaleValue),
 			'neighbourDistance': (100, 300)
 		})
 
@@ -67,10 +70,10 @@ class Guppy(Fish):
 		self._state = 'idle'
 		self._states = DictWrap({
 			'idle': {
-				'speedMultiplier': 1,
+				'speedMultiplier': 0.5,
 				'massMultiplier': 1,
-				'wanderInfluence': 0.8,
-				'feelerPercentage': 1.0, 
+				'wanderInfluence': 0.9,
+				'feelerPercentage': 1.5, 
 				'acceleration': self.idleSteer
 			},
 			'seekFood': {
@@ -79,6 +82,13 @@ class Guppy(Fish):
 				'wanderInfluence': 0.1,
 				'feelerPercentage': 0.5,
 				'acceleration': self.feedingSteer
+			},
+			'hide': {
+				'speedMultiplier': 5.5,
+				'massMultiplier': 0.5,
+				'wanderInfluence': 0.1,
+				'feelerPercentage': 0.3,
+				'acceleration': self.scaredSteer
 			},
 			'dead': {
 				'speedMultiplier': 1.0,
@@ -137,6 +147,17 @@ class Guppy(Fish):
 		# Sickness has changed, so recalculate our color
 		self.recalculateColor()
 
+
+	@property
+	def dead(self):
+		return self._dead
+
+
+	@dead.setter
+	def dead(self, value):
+		self._dead = value
+		self.recalculateColor()
+		
 	
 	def colorForSickness(self, sickness, colorScale):
 		# Make sure it's within range
@@ -201,13 +222,25 @@ class Guppy(Fish):
 
 
 	def calculateCurrentState(self):
-		state = 'idle'
-
+		
 		if(self.dead):
 			return 'dead'
 
+		# We're not dead!
+
+		state = 'idle'
+		
+		# If there's some food in the tank...
 		if(len(self.food)):
 			state = 'seekFood'
+
+		# If any hunters are awake
+		if(True in [h.awake for h in self.world.hunters]):
+			state = 'hide'
+
+			# But if we're super sick, then 
+			if(self.sickness > self._sicknessDomain[1] * 0.7):
+				state = 'seekFood'
 
 		return state
 
@@ -278,112 +311,52 @@ class Guppy(Fish):
 
 		
 
-	def swayShape(self):
-
-		# TODO: Optimise this somehow. 
-		# At the very least cache it so that both sway functions can use it without recalculating
-		sqrtSpeed = self.speedSqrt()
-
-		# Speed up fins as we slow down, illusion of swimming harder
-		frequency = sqrtSpeed * 0.4
-		
-		# The bigger the fish, the slower it should paddle
-		# frequency /= (1 + self.body * 0.25)
-
-		# if(self.chosenOne):	print 'spedFreq', frequency
-		frequency = Util.clamp(2, frequency, 3)
-		# if(self.chosenOne):	print 'clampedFreq', frequency
-
-		# print 'sqrtSpeed', self.speedSqrt(), 'freq', frequency
-
-		swayAngle = sin(self.world._clock * frequency)
-		# print 'frequency', frequency
-
-		swayRange = sqrtSpeed / 80
-		# print 'swayRange', swayRange
-
-		matrix = Matrix33()
-		matrix.scale_update(1 + (swayAngle * 0.2 * sqrt(swayRange)), 1)
-		# self.matrix.rotate_update(swayAngle * swayRange)
-
-		shape = copy.deepcopy(self.fishShape)
-		matrix.transform_vector2d_list(shape)
-		
-		return shape
 
 
 
-	def swayPosition(self):
 
-		sqrtSpeed = self.speedSqrt()
-		# frequency = sqrtSpeed * 0.4
-		frequency = 0.1 * sqrtSpeed
-		swayRange = 0.2 * sqrtSpeed
-
-
-		offsetAngle = cos((self.world._clock) * frequency / 2)
-		offset = self.side * swayRange * offsetAngle
-		position = self.pos + offset
-		
-		return position
-		
-
-	def drawEye(self, color=None):
-		
-
-		if(self.dead):
-			egi.set_pen_color(self.color)
-			egi.cross(self.renderPosition + self.side * self.body, self.body * 5)
-		else:	
-			egi.set_pen_color(rgba('fff', 0.5))
-			egi.circle(self.renderPosition + self.side * self.body, self.body)
+	'''
+	Update logic
+	=====================================
+	'''
 
 
-	def beforeRender(self):
-		# Update the rotation
-		
-
-		egi.green_pen()
-		# line = self.matrix.transform_vector2d(Vector2D(0, 100))
-		# egi.line_by_pos(self.pos, self.pos + line )
-
-	def calculateRenderPosition(self):
 
 
-		self.renderPosition = self.swayPosition()
-		self.vehicle_shape = self.swayShape()
-		
-	
-	def centerAttraction(self):
-		return self.seek(self.world.tank.center())
+	def beforeUpdate(self):
+
+		# Cache this value cause we use it twice in different methods
+		self.speedSqrt = sqrt(self.speed())
+		self.state = self.currentState()
+		# Grab our food
+		self.food = self.world.getFood(self)
 
 
 
 	def calculateAcceleration(self, delta):
 
-		self.state = self.currentState()
-		self.feelerPercentage = self.state.feelerPercentage
+		
+		self.feelerPercentage = self.state['feelerPercentage']
 
 
-		stateForce = self.state.acceleration(delta)
+		# Grab the base acceleration from whatever our current state is
+		stateForce = self.state['acceleration'](delta)
 
+		# All states need to steer away from walls
 		wallForce = self.wallSteer(delta)
 
-		netForce = stateForce + wallForce
-		
-
-		
+		# Calculate the net force
+		netForce = stateForce + wallForce 
 
 		# Save for debugging purposes
 		self.force = netForce
 
-		mass = self.mass * self.state.massMultiplier
+		# Calculate our mass based on our current state
+		mass = self.mass * self.state['massMultiplier']
 
 		
 
 		return netForce / mass
-
-
 
 
 	# Calculates velocity based on our acceleration
@@ -407,78 +380,169 @@ class Guppy(Fish):
 
 		return vel
 
+
+
+
+
+
+
+
+
+
+	'''
+	Steering behaviours
+	=====================================
+	'''
+
+	def scaredSteer(self, delta):
+		hideForce =  self.hidingSteer(delta, closest=False)
+		avoidHuntersForce, hunterDist = self.avoidHuntersSteer(delta)
+
+		return hideForce + avoidHuntersForce
+
+
+	def survivalSteer(self, delta):
+		avoidHunters, hunterDist = self.avoidHuntersSteer(delta)
+		# avoidHunters *
+		hideForce =  self.hidingSteer(delta) / (hunterDist / 20000) / (avoidHunters.length() / 100)
+
+		steer = avoidHunters + hideForce 
+
+		if(self.chosenOne and self.world.drawHidingSpots):
+			egi.green_pen()
+			egi.line_by_pos(self.pos, self.pos + avoidHunters * 5)
+			# print 'avoidHunters', avoidHunters
+			egi.red_pen()
+			egi.line_by_pos(self.pos, self.pos + hideForce * 5)
+			# print 'hideForce', hideForce
+			egi.orange_pen()
+			# egi.line_by_pos(self.pos, self.pos + steer * 5)
+			
+
+		return steer
+
+
+	
+
+
+	# Simple acceleration downwards from the world's gravity
 	def deadSteer(self, delta):
 
-		return self.world.gravity
+		return self.world.gravity * self.mass
+
+
+	# Steers away from hunters, getting stronger as you get closer
+	def avoidHuntersSteer(self, delta):
+
+		hunterPositions = [h.pos for h in self.world.hunters]
+		count = len(hunterPositions)
+
+		if(count == 0):
+			return Vector2D()
+		
+		total = reduce(lambda x, y: x + y, hunterPositions)
+		avg = total / float(count)
+
+		distance = self.pos.distanceTo(avg)
+		lengthSq = distance.lengthSq()**1.1
+
+		steer = -5000000 * distance.normalise() / lengthSq
+
+		
+
+		return steer, lengthSq
 
 
 
-	# Avoids the tank walls
+	# Avoids the tank walls. The force gets stronger the closer you are to them
 	def wallSteer(self, delta):
 
-		wallForce = self.wallAvoidance(self.world.tank.walls) * 2
+		wallForce = self.wallAvoidance(self.world.tank.getWalls('vertical')) * 2
 
-		if(self.chosenOne and self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.drawDebug):
 			egi.red_pen()
 			egi.line_by_pos(self.pos, self.pos + wallForce * 5)
 
 		return wallForce
 
 
+	# Perform any collision detection we want to do
 	def collisionDetection(self):
 		
 		self.keepInsideTank()
 
+
+	# Physically prevents fish from being outside the tank bounds
 	def keepInsideTank(self):
 		p = self.pos
 
 		tank = self.world.tank.box
 		
 		if(p.y > tank.top):
-			print 'above tank'
 			p.y = tank.top
-			# self.vel.y *= -0.8
+			self.vel.y *= -0.5
 
-		if(p.y < tank.bottom):
+		if(p.y < tank.bottom and not self.dead):
 			p.y = tank.bottom
-			# self.vel.y *= -0.8
 
-		if(p.x > tank.right):
-			p.x = tank.right
-			# self.vel.x *= -0.8
+		# Don't bother on the left and right
+		# if(p.x > tank.right):
+		# 	p.x = tank.right
+		# 	self.vel.x *= -0.5
 
-		if(p.x < tank.left):
-			p.x = tank.left
-			# self.vel.x *= -0.8
+		# if(p.x < tank.left):
+		# 	p.x = tank.left
+		# 	self.vel.x *= -0.5
+
+
+	def hidingSteer(self, delta, closest=True):
+
+		hiding = self.hide(hunters=self.world.hunters, obstacles=self.world.obstacles, closest=closest)
+
+		if(self.chosenOne and self.world.drawDebug):
+			egi.red_pen()
+			egi.line_by_pos(self.pos, self.pos + hiding * 5)
+
+		return hiding
 
 
 	def idleSteer(self, delta):
 
-		wanderForce = self.wander(delta) * self.state.wanderInfluence
+		wanderForce = self.wander(delta) * self.state['wanderInfluence']
 		
 		flockForce = self.flock(delta) * self.flockingInfluence
 
 		# obstaclesForce = self.obstacleAvoidance(self.world.solids)
+		
+		maxCenterForce = 250
+		
+		percentFromCenterX = (self.pos.x - self.world.center.x) / self.world.width
+		percentFromCenterY = (self.pos.y - self.world.center.y) / self.world.height
 
 		
+		
+		# Square the falloff
+		valueX = -Util.sign(percentFromCenterX)*(maxCenterForce * percentFromCenterX**2)
+		valueY = -Util.sign(percentFromCenterY)*(maxCenterForce * percentFromCenterY**2)
+		
+		centerForce = Vector2D(valueX, valueY)
+		
+		
+		survivalSteer = self.survivalSteer(delta)
 
-		distanceFromCenterSq = (self.pos - self.world.center).lengthSq()
+		foodForce = self.foodSteer(delta) * (1 + self.sickness / 10)
 
-		amount = 1 + distanceFromCenterSq * 0.00002
-		# if(distanceFromCenterSq > 50):
-			# print 'amount', amount
-		flockForce /= amount
-
-		centerForce = self.seek(self.world.center)
-		centerForce *= amount**2.2 * 0.01
+		self.maxSpeed = self.stat('speed') - (self.sickness / 2)
+		
+		
 
 
 
-		netForce = wanderForce + flockForce + centerForce
+		netForce = wanderForce + flockForce + centerForce + survivalSteer + foodForce
 
 		# print 'self.flockingInfluence', self.flockingInfluence
 
-		if(self.chosenOne and self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.drawDebug):
 			egi.blue_pen()
 			egi.line_by_pos(self.pos, self.pos + wanderForce * 5)
 			egi.green_pen()
@@ -628,7 +692,23 @@ class Guppy(Fish):
 		return bestFood
 
 
+	def foodSteer(self, delta):
 
+		steeringForce = Vector2D()
+
+		bestFood = self.findBestFood(self.food)
+
+
+		if(bestFood is not None):
+			steeringForce = self.pursuit(bestFood)
+		# else:
+		# 	steeringForce = self.idleSteer(delta)
+
+		if(self.chosenOne and self.world.drawDebug):
+			egi.orange_pen()
+			egi.line_by_pos(self.pos, self.pos + steeringForce)
+
+		return steeringForce
 
 
 
@@ -637,29 +717,36 @@ class Guppy(Fish):
 
 		
 		
-		bestFood = self.findBestFood(self.food)
-
-
-		if(bestFood is not None):
-			steeringForce = self.pursuit(bestFood)
-		else:
-			steeringForce = self.idleSteer(delta)
-
-		if(self.chosenOne and self.world.debug.drawDebug):
-			egi.orange_pen()
-			egi.line_by_pos(self.pos, self.pos + steeringForce)
 		
 
-		return steeringForce
+
+		wanderForce = self.wander(delta) * self.state['wanderInfluence']
+		
+
+		
+		
+		avoidHuntersForce, hunterDist = self.avoidHuntersSteer(delta)
+
+		avoidHuntersForce /= (1 + self.sickness / 20)
+
+		self.maxSpeed = self.stat('speed') - (self.sickness / 2)
+		
+		
+		foodForce = self.foodSteer(delta)
+
+
+		netForce = foodForce + wanderForce + avoidHuntersForce
+		
+
+		return netForce
 
 
 	def eatNearbyFood(self):
 
+		if(self.dead): return
 		
-		
-		nearby = [f for f in self.food if f.pos.distance(self.pos) < self.feedRadius + f.radius]
+		[self.eat(f) for f in self.food if f.pos.distanceSq(self.pos) < (self.feedRadius + f.boundingRadius)**2]
 
-		[self.eat(f) for f in nearby]
 
 
 	def spurtBaby(self, babyFish):
@@ -689,37 +776,97 @@ class Guppy(Fish):
 			[self.spurtBaby(f) for f in newFishes]
 
 
+
+	'''
+	Rendering logic
+	=====================================
+	'''
+
+		
+
+	def swayShape(self):
+
+		# TODO: Optimise this somehow. 
+		# At the very least cache it so that both sway functions can use it without recalculating
+		sqrtSpeed = self.speedSqrt
+
+		# Speed up fins as we slow down, illusion of swimming harder
+		frequency = sqrtSpeed * 0.4
+		
+		# The bigger the fish, the slower it should paddle
+		# frequency /= (1 + self.body * 0.25)
+
+		# if(self.chosenOne):	print 'spedFreq', frequency
+		frequency = Util.clamp(2, frequency, 3)
+		# if(self.chosenOne):	print 'clampedFreq', frequency
+
+		# print 'sqrtSpeed', self.speedSqrt(), 'freq', frequency
+
+		swayAngle = sin(self.world._clock * frequency)
+		# print 'frequency', frequency
+
+		swayRange = sqrtSpeed / 80
+		# print 'swayRange', swayRange
+
+		matrix = Matrix33()
+		matrix.scale_update(1 + (swayAngle * 0.2 * sqrt(swayRange)), 1)
+		# self.matrix.rotate_update(swayAngle * swayRange)
+
+		shape = deepcopy(self.fishShape)
+		matrix.transform_vector2d_list(shape)
+		
+		return shape
+
+
+
+	def swayPosition(self):
+
+		sqrtSpeed = self.speedSqrt
+		# frequency = sqrtSpeed * 0.4
+		frequency = 0.1 * sqrtSpeed
+		swayRange = 0.5 * self.size
+
+
+		frequency = Util.clamp(0, frequency, 0.5)
+
+
+		offsetAngle = cos((self.world._clock) * frequency / 2)
+		offset = self.side * swayRange * offsetAngle
+		position = self.pos + offset
+		
+		return position
+		
+
+	def drawEye(self, color=None):
+		
+
+		if(self.dead):
+			egi.set_pen_color(self.color)
+			egi.cross(self.renderPosition + self.side * self.body, self.body * 5)
+		else:	
+			egi.set_pen_color(rgba('fff', 0.5))
+			egi.circle(self.renderPosition + self.side * self.body, self.body)
+
+
+	def calculateRenderPosition(self):
+
+		# No animation
+		# self.renderPosition = self.pos.copy()
+		# self.vehicle_shape = self.baseFishShape
+
+		# Animation!
+		self.renderPosition = self.pos # self.swayPosition()
+		self.vehicle_shape = self.swayShape()
+
+
 	def initShape(self):
 
-		
-
-		P = Vector2D
-		
-		# Made using BeTravis's excellent path-to-polygon tool
+		# Made the string using BeTravis's excellent path-to-polygon tool
 		# http://betravis.github.io/shape-tools/path-to-polygon/
 
-		baseShape = [
-			P(1.35, 0.23),
-			P(1.09, 0.26),
-			P(0.86, 0.33),
-			P(0.67, 0.45),
-			P(0.54, 0.60),
-			P(0.01, 0.03),
-			P(0.01, 1.59),
-			P(0.53, 1.03),
-			P(0.66, 1.19),
-			P(0.85, 1.31),
-			P(1.08, 1.39),
-			P(1.35, 1.42),
-			P(1.70, 1.37),
-			P(1.98, 1.25),
-			P(2.16, 1.06),
-			P(2.23, 0.83),
-			P(2.16, 0.59),
-			P(1.98, 0.41),
-			P(1.70, 0.28),
-			P(1.35, 0.23)
-		]
+		simplifiedStr = '60.893 10.414, 24.234 27.027, 0.500 1.280, 0.500 71.728, 23.768 46.486, 60.893 63.900, 88.899 56.066, 100.500 37.159, 88.898 18.250, 60.893 10.414, 60.893 10.414'
+
+		baseShape = Util.shapeFromString(simplifiedStr)
 
 		maxX = max(baseShape, key= lambda d: d.x).x
 		maxY = max(baseShape, key= lambda d: d.y).y
@@ -740,36 +887,35 @@ class Guppy(Fish):
 		# Set center point to mid-taixl
 		# Util.translatePoints(baseShape, x=desiredWidth * -0.6, y=-desiredHeight/2)
 		# Set center point to mid-head
-		Util.translatePoints(baseShape, x=desiredWidth * -0.9, y=-desiredHeight/2)
+		Util.translatePoints(baseShape, x=desiredWidth * -0.8, y=-desiredHeight/2)
 
 		self.baseFishShape = baseShape
-
 
 
 
 	# Get the fish shape based on a scale
 	def fishShapeForScale(self, scale = 1):
 
-		baseShape = copy.deepcopy(self.baseFishShape)
+		baseShape = deepcopy(self.baseFishShape)
 		points = Util.scalePoints(baseShape, scale, scale)
 
 		return points
 
 
-
-
-
-
-
-
+	# Draw ourselves to the screen
 	def render(self):
-		# egi.set_stroke(2)
+		
+		egi.set_stroke(1)
 
 		self.super.render()
 
-		if(self.chosenOne and self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.drawDebug):
 			egi.grey_pen()
 			egi.text_at_pos(self.pos.x, self.pos.y, str(self.sickness))
+			egi.text_at_pos(self.world.width - 100, self.world.height - 30, str(self._state))
+			
+
+		
 
 		
 		

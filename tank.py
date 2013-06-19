@@ -13,8 +13,6 @@ class Tank(object):
 
 	def __init__(self, world = None):
 
-		print 'Tank __init__'
-
 		self.world = world
 
 		# Water colors
@@ -23,7 +21,7 @@ class Tank(object):
 		# Don't let fish spawn within this far of the edge
 		self.padding = 0.08
 
-		m = 20
+		m = 1
 		self.margin = DictWrap({
 			'left': m,
 			'top': 100,
@@ -67,8 +65,8 @@ class Tank(object):
 			'bottom': self.box.bottom + p[1]
 		})
 
-		# Get the wall segments for rendering and collisions
-		self.walls = self.getWalls()
+		
+		
 
 		# Create the shape pusing the walls
 		waveHeight = 40
@@ -79,29 +77,72 @@ class Tank(object):
 			V(b.right, b.top + waveHeight)
 		]
 
-		
-		
-		# self.wave.append(Vector2D(500, 800))
-		# print 'wave', self.wave
-
-	def getWalls(self):
-		b = self.box
-		return [
+		# Get the wall segments for rendering and collisions
+		self._walls = {
 			# The order of these pairs is important.
 			# We want the normals to be pointing into the center
 			# (avoids having to reverse them to face the fish later)
 
 			# Left wall
-			Wall( Vector2D(b.left, b.top), Vector2D(b.left, b.bottom) ),
+			'left': Wall( Vector2D(b.left, b.top), Vector2D(b.left, b.bottom) ),
 			# Right wall
-			Wall( Vector2D(b.right, b.bottom), Vector2D(b.right, b.top) ),
+			'right': Wall( Vector2D(b.right, b.bottom), Vector2D(b.right, b.top) ),
 			# Top wall
-			Wall( Vector2D(b.right, b.top), Vector2D(b.left, b.top) ),
+			'top': Wall( Vector2D(b.right, b.top), Vector2D(b.left, b.top) ),
 			# Bottom wall
-			Wall( Vector2D(b.left, b.bottom), Vector2D(b.right, b.bottom) )
+			'bottom': Wall( Vector2D(b.left, b.bottom), Vector2D(b.right, b.bottom) )
+		}
+
+		# Shorthand prop to prevent function overhead when getting all walls
+		self.walls = [
+			self._walls['left'],
+			self._walls['right'],
+			self._walls['top'],
+			self._walls['bottom']
 		]
 
-	def createWave(self, width, amplitude = 50, wavelength=60, smoothness = 10, start = Vector2D(), seed = 0):
+		
+		
+		# self.wave.append(Vector2D(500, 800))
+		# print 'wave', self.wave
+
+	def getWalls(self, which='all'):
+		
+		if(which == 'all'):
+			return self._walls
+
+		if(which == 'vertical'):
+			return [
+				self._walls['top'],
+				self._walls['bottom']
+			]
+
+		if(which == 'horizontal'):
+			return [
+				self._walls['left'],
+				self._walls['right']
+			]
+
+		return self._walls[which]
+
+
+	def wavePoint(self, i, interval, seed, wavelength, amplitude, start):
+		x = interval * i
+		
+		thetaNarrow = pi/2 * (seed + x / wavelength)
+		smallWaves = amplitude * sin(thetaNarrow)
+
+		thetaWide = pi/2 * (seed + x / wavelength / 2)
+		bigWaves = amplitude * sin(thetaWide) * 1
+
+		y = smallWaves + bigWaves
+
+		return Vector2D(start.x + x, start.y + y)
+
+
+	# Generates a line segment based on the input parameters
+	# When rendered using an animated seed value, looks like a wave
+	def createWave(self, width, amplitude = 50, wavelength=60, smoothness = 25, start = Vector2D(), seed = 0):
 
 
 
@@ -118,22 +159,23 @@ class Tank(object):
 		# 	theta = x / wavelength * 2 * pi
 		# 	return amplitude * sin(theta)
 
+		pts = [self.wavePoint(i=i, interval=interval,seed=seed,wavelength=wavelength,amplitude=amplitude, start=start) for i in range(numPoints + 1)]
+
 		
-		for i in range(numPoints + 1):
-			x = interval * i
+		# for i in range(numPoints + 1):
+		# 	x = interval * i
 			
-			# y = wave(x)
-			theta = pi/2 * (seed + x / wavelength)
-			smallWaves = amplitude * sin(theta)
+		# 	thetaNarrow = pi/2 * (seed + x / wavelength)
+		# 	smallWaves = amplitude * sin(thetaNarrow)
 
-			thetaWide = pi/2 * (seed + x / wavelength / 2)
-			bigWaves = amplitude * sin(thetaWide) * 1
+		# 	thetaWide = pi/2 * (seed + x / wavelength / 2)
+		# 	bigWaves = amplitude * sin(thetaWide) * 1
 
-			y = smallWaves + bigWaves
-			# + (sin(seed) * 5 * sin(theta))
-			pos = Vector2D(start.x + x, start.y + y)
+		# 	y = smallWaves + bigWaves
+
+		# 	pos = Vector2D(start.x + x, start.y + y)
 			
-			pts.append(pos)
+		# 	pts.append(pos)
 
 		
 
@@ -151,7 +193,8 @@ class Tank(object):
 		egi.unclosed_shape(self.createWave(seed= seed, amplitude = 7, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 10) ))
 		
 		egi.set_pen_color(color=rgba(water[1], 0.5))
-		egi.unclosed_shape(self.createWave(seed= seed/2, amplitude = 3, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 0) ))
+		self.mainWave = self.createWave(seed= seed/2, amplitude = 3, width = self.size.width, start = Vector2D(self.box.left, self.box.top + 0) )
+		egi.unclosed_shape(self.mainWave)
 		
 		
 		egi.set_pen_color(color=rgba(water[2], 0.5))
@@ -177,6 +220,9 @@ class Tank(object):
 		egi.set_pen_color(color=rgba(tank, 0.6))
 		egi.set_stroke(2)
 
+		self.tankShape[0].y = self.mainWave[0].y
+		self.tankShape[-1].y = self.mainWave[-1].y
+
 		egi.unclosed_shape(self.tankShape)
 
 	def contains(self, point):
@@ -188,11 +234,12 @@ class Tank(object):
 
 	def render(self):
 		
-		self.drawWalls()
 		self.drawWaves()
+		self.drawWalls()
+		
 		egi.set_stroke(1)
 
-		if(self.world.debug.drawDebug):
+		if(self.world.drawDebug):
 			for wall in self.walls:
 				egi.line_by_pos(wall.center, wall.center + wall.normal * 100)
 

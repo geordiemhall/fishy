@@ -1,8 +1,9 @@
 # Util
 # ==================================
 
-
+from vector2d import Vector2D
 import copy
+
 
 class DictWrap(object):
     """ Wrap an existing dict, or create a new one, and access with either dot 
@@ -138,6 +139,19 @@ class Util(object):
     def strPoints(points):
         return [str(pt) for pt in points]  
 
+    @staticmethod 
+    def sign(num):
+        if(num >= 0.0): return 1
+        return -1
+
+    @staticmethod
+    def shapeFromString(string, pointDelimiter=',', coordDelimiter=' '):
+        # Grab the points
+        points = [p.strip().split(coordDelimiter) for p in string.split(pointDelimiter)]
+        # Convert coordinates to vectors
+        points = [Vector2D(float(c[0]), float(c[1])) for c in points]
+
+        return points
 
     
     

@@ -1,20 +1,23 @@
-'''An agent with Seek, Flee, Arrive, Pursuit behaviours
+'''
 
-Created for HIT3046 AI for Games by Clinton Woodward cwoodward@swin.edu.au
+Base class for swimming agents.
+Has some basic steering behaviours which are combined
+in sub-classes to create behaviour
 
 '''
 
-from vector2d import Vector2D, Point2D, Rect
-from graphics import egi, COLOR_NAMES, rgba
-from math import sin, cos, radians, sqrt, pi
-from random import random, randrange, uniform
 
+# Vendor imports
+from vector2d import Vector2D, Rect
+from graphics import egi, COLOR_NAMES
+from math import sin, cos, radians, sqrt, pi
+from random import uniform
 from transformations2d import *
 from geometry import *
-from util import *
-# from path import Path
 
+# Constants
 BIG_FLOAT = float(32000)
+
 
 
 
@@ -27,29 +30,27 @@ class Fish(object):
 		'fast': 0.5
 	} 
 
-	def __init__(self, world=None, scale=30.0, mass=1.0, mode='wander'):
+	def __init__(self, world=None, scale=30.0, mass=1.0):
 
-		print 'Fish init'
-
-		# keep a reference to the world object
+		# Keep a reference to the world object
 		self.world = world
-		self.mode = mode
-		# use the world's path initially
-		# self.path = world.path
-		# where am i and where am i going? random
-		dir = radians(random()*360)
+
+		# Randomize our initial direction
+		dir = radians(uniform(0, 360))
+
+		# Basic properties
 		self.pos = world.tank.randomPosition()
 		self.vel = Vector2D()
 		self.heading = Vector2D(sin(dir),cos(dir))
 		self.side = self.heading.perp()
 		self.scale = Vector2D(scale,scale) # easy scaling of agent size
 		self.scaleValue = scale
-		self.force = Vector2D() # current steering force
 		self.mass = mass
-		
-		self.radius = 15
 
-		# limits?
+		# Bounding circle
+		self.boundingRadius = 15
+
+		# Limits
 		self.maxSpeed = 18.0 * scale
 		self.fleeDistance = 200
 		self.waypointThreshold = 50
@@ -60,25 +61,20 @@ class Fish(object):
 		
 		
 
-		# data for drawing this agent
+		# Drawing
 		self.color = COLOR_NAMES['ORANGE']
-		self.vehicle_shape = [
-			Point2D(-1.0, 0.6),
-			Point2D( 1.0, 0.0),
-			Point2D(-1.0,-0.6)
-		]
+		self.vehicle_shape = [ Vector2D(-1.0, 0.6),	Vector2D( 1.0, 0.0), Vector2D(-1.0,-0.6) ]  # generic shape
 		self.chosenOne = False
 
-		# NEW WANDER INFO
+		# Wander
 		self.wander_target = Vector2D(1,0)
 		self.wanderDistance = 1.0 * scale # adjust
 		self.wanderRadius = 1.2 * scale # adjusteg something bigger than the scale 
 		self.wander_jitter = 10.0 * scale
 		self.bRadius = scale
-		self.max_force = 400
-		# self.max_wander_speed = 200
+		self.maxForce = 400
 
-		# Group dynamic variables
+		# Flocking
 		self.alignmentInfluence = 25
 		self.separationInfluence = 200
 		self.wanderInfluence = 2
@@ -87,19 +83,18 @@ class Fish(object):
 		self.neighbourDistance = 8 * scale
 		self.isNeighbour = False # Draw yourself a different colour cause you're a neighbour of the chosen one
 		self.neighbours = []
-		self.food = []
-
 
 		# Collision detection
 		self.minBoxLength = 15
 		self.tagged = False
 
-		self.dead = False
+		# Life
+		self._dead = False
 
 
 	
 
-
+	# Separate function for calculating acceleration
 	def calculateAcceleration(self, delta):
 
 		self.force = self.wander(delta)
@@ -119,30 +114,37 @@ class Fish(object):
 		return vel
 
 
-	# Hook for subclasses, called after data loaded, 
-	# but before position and state are calculated
+	'''
+	Hooks for subclasses
+	===============================
+	'''
+
+	
+	# Called after data loaded, but before position and state are calculated
 	def performActions(self):
 		pass
 
+	# Called after position has been calculated
 	def collisionDetection(self):
 		pass
+
+	# Called at the beginning of update
+	def beforeUpdate(self):
+		egi.set_stroke(1) # we want our debug info to be 1px
 
 
 	def update(self, delta):
 
-		
+		self.beforeUpdate()
 
-		# Grab our neighbours
+		# Grab our neighbours for flocking
 		self.neighbours = self.world.getNeighbours(self, self.neighbourDistance) 
-
-		# Grab our food
-		self.food = self.world.getFood(self)
 		
 		self.performActions()
 
 
 
-		''' update vehicle position and orientation '''
+		# Update vehicle position and orientation
 		self.acceleration = self.calculateAcceleration(delta)
 
 		self.vel = self.calculateVelocity(delta)
@@ -159,7 +161,7 @@ class Fish(object):
 			self.side = self.heading.perp()
 		
 		# treat world as continuous space - wrap new position if needed
-		self.world.wrap_around(self.pos)
+		if(not self._dead): self.world.wrap_around(self.pos)
 
 
 	def pointsInWorldSpace(self, points, position):
@@ -168,14 +170,15 @@ class Fish(object):
 
 
 	def drawBody(self, color=None):
-		egi.set_pen_color(self.color)
+		egi.set_pen_color(color)
 
-		if(self.world.debug.drawDebug):
+		if(self.world.drawDebug):
 			if(self.isNeighbour): 
 				egi.blue_pen()
 			if(self.tagged):
 				egi.green_pen()
-			if(self.chosenOne): 
+		if(self.chosenOne): 
+			if(self.world.drawDebug or self.world.drawComponentForces):
 				egi.white_pen()
 
 		pts = self.pointsInWorldSpace(self.vehicle_shape, self.renderPosition)
@@ -204,19 +207,21 @@ class Fish(object):
 
 		self.calculateRenderPosition()
 		
-		
+		if(color is None):
+			color = self.color
 
 		''' Draw the triangle agent with color'''
 		self.drawBody(color)
+
 		
-		if(not self.world.debug.drawDebug):
+		if(not self.world.drawDebug or not self.chosenOne):
 			return
 		
 		# Debug stuff to draw for all agents
 		
 
-		if not self.chosenOne:
-			return
+		# if not self.chosenOne:
+		# 	return
 		# Debug stuff to only draw for one agent
 
 		egi.circle(self.pos, self.boundingRadius)
@@ -227,7 +232,7 @@ class Fish(object):
 		egi.grey_pen()
 		wnd_pos = Vector2D(0, 0)
 		
-		egi.circle(self.pos, self.neighbourDistance)
+		
 
 		# Draw wander info
 		# calculate the center of the wander circle
@@ -250,8 +255,7 @@ class Fish(object):
 	def speed(self):
 		return self.vel.length()
 
-	def speedSqrt(self):
-		return sqrt(self.speed())
+	
 
 
 
@@ -293,7 +297,7 @@ class Fish(object):
 
 			# Steering = Desired minus Velocity
 			steer = desired - self.vel
-			steer.truncate(self.max_force)  # Limit to maximum steering force
+			steer.truncate(self.maxForce)  # Limit to maximum steering force
 		else:
 			steer = Vector2D()
 
@@ -337,7 +341,7 @@ class Fish(object):
 
 		projected = self.projectedPosition(target)
 
-		if(self.world.debug.drawDebug and self.chosenOne):
+		if(self.world.drawDebug and self.chosenOne):
 			egi.red_pen()
 			egi.cross(projected, 10)
 
@@ -398,7 +402,7 @@ class Fish(object):
 
 		# force.truncate(self.maxWanderSpeed)
 
-		force.truncate(self.max_force) # <-- new force limiting code... return force
+		force.truncate(self.maxForce) # <-- new force limiting code... return force
 
 		self.wandering = True
 		return force * self.wanderInfluence # <-- You might want to weight this...
@@ -416,7 +420,7 @@ class Fish(object):
 		separation = self.separationForce()
 		cohesion = self.cohesionForce()
 
-		if(self.chosenOne and self.world.debug.drawComponentForces):
+		if(self.chosenOne and self.world.drawComponentForces):
 			s = 0.1
 			egi.green_pen()
 			egi.line_with_arrow(self.pos, self.pos + alignment * s, 10)
@@ -426,6 +430,7 @@ class Fish(object):
 			egi.line_with_arrow(self.pos, self.pos + cohesion * s, 10)
 			egi.grey_pen()
 			egi.line_with_arrow(self.pos, self.pos + self.force * s, 10)
+			egi.circle(self.pos, self.neighbourDistance)
 
 		return alignment + separation + cohesion
 
@@ -436,9 +441,15 @@ class Fish(object):
 		avg = Vector2D() 
 		count = 0
 
+		# velocities = [fish.vel for fish in self.neighbours if self.pos.distanceSq(fish.pos) > 0]
+		# count = len(velocities)
+		
+		# if(count):
+		# 	avg += reduce(lambda x, y: x + y, velocities)
+		
 
 		for agent in self.neighbours:
-			d = self.pos.distance(agent.pos)
+			d = self.pos.distanceSq(agent.pos)
 			if(d > 0):
 
 				avg += agent.vel 
@@ -451,7 +462,7 @@ class Fish(object):
 
 		avg *= 150
 		
-		avg.truncate(self.max_force)
+		avg.truncate(self.maxForce)
 
 		return avg
 
@@ -486,7 +497,7 @@ class Fish(object):
 
 		# Radius within which to steer away
 		DESIRED_SEPARATION = 60
-		if(self.world.debug.drawDebug and self.chosenOne):
+		if(self.world.drawDebug and self.chosenOne):
 			egi.circle(self.pos, DESIRED_SEPARATION)
 
 		for agent in self.neighbours:
@@ -507,9 +518,9 @@ class Fish(object):
 
 		
 
-		avg *= 10000
+		avg *= 20000
 
-		avg.truncate(self.max_force)
+		avg.truncate(self.maxForce)
 		
 
 		return avg
@@ -621,7 +632,7 @@ class Fish(object):
 			# We must have intersected the box, so tag ourselves
 			tagged.append(obj)
 
-			if(self.chosenOne and self.world.debug.drawDebug): 
+			if(self.chosenOne and self.world.drawDebug): 
 				obj.tagged = True
 				egi.circle(obj.localPos, radius)
 
@@ -635,7 +646,7 @@ class Fish(object):
 		boxWidth = self.boundingRadius * 2
 
 		# Draw the collision box
-		if(self.chosenOne and self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.drawDebug):
 			box = Rect({
 				'left': 0, 
 				'right': boxLength, 
@@ -717,7 +728,7 @@ class Fish(object):
 
 		feelers = [center, left, right]
 
-		if(self.chosenOne and self.world.debug.drawDebug):
+		if(self.chosenOne and self.world.drawDebug):
 			egi.aqua_pen()
 			egi.line_by_pos(self.pos, center)
 			egi.line_by_pos(self.pos, left)
@@ -769,42 +780,64 @@ class Fish(object):
 
 
 
-	def hide(self):
+	def hide(self, hunters, obstacles, closest=True):
 
-	    hidingPlaces = []
+		hidingPlaces = []
 
-	    for hunter in self.world.hunters:
-	        for obstacle in self.world.obstacles:
-	            dir = hunter.pos.distanceTo(obstacle.pos).get_normalised()
-	            length = hunter.pos.distance(obstacle.pos) + obstacle.radius + self.scale.x * 1.5
-	            
-	            place = hunter.pos + dir * length
+		for hunter in hunters:
+			for obstacle in obstacles:
+				dir = hunter.pos.distanceTo(obstacle.pos).get_normalised()
+				length = hunter.pos.distance(obstacle.pos) + obstacle.boundingRadius + self.boundingRadius
+				
+				# Calculate the position of the hiding spot
+				place = hunter.pos + dir * length
 
-	            hidingPlaces.append(place)
+				# If this spot isn't inside any other obstacles, then add it to the list
+				if(not True in [ob.containsPoint(place) for ob in obstacles]):
+					hidingPlaces.append(place)
 
-	    self.hidingPlaces = hidingPlaces
-	    self.bestPlace = self.bestHidingPlace(hidingPlaces, self.world.hunters[0])
+		self.hidingPlaces = hidingPlaces # store for debugging purposes
 
-	    # print 'bestPlace', self.bestPlace
+		# Find the 'best' hiding place from our list
+		self.bestPlace = self.bestHidingPlaceFromHunter(hidingPlaces=hidingPlaces, hunter=hunters[0], closest=closest)
 
-	    # seek = self.seek(self.bestPlace)
-	    arrive = self.arrive(self.bestPlace, 'normal')
+		# print 'bestPlace', self.bestPlace
 
-	    return arrive
+		# seek = self.seek(self.bestPlace)
+		arrive = self.arrive(self.bestPlace, 'fast')
+
+		if(self.chosenOne and self.world.drawHidingSpots):
+			for place in self.hidingPlaces or []:
+				egi.red_pen()
+				if(place == self.bestPlace): egi.green_pen()
+				egi.cross(place, 10)
+
+		return arrive
 
 
 
-	def bestHidingPlace(self, hidingPlaces, hunter):
+	def bestHidingPlaceFromHunter(self, hidingPlaces, hunter, closest=True):
 
-	    closestPlaces = sorted(hidingPlaces, key=lambda p: p.distance(self.pos))
-	    
-	    safePlaces = filter(lambda p: p.distance(hunter.pos) > hunter.threatRadius, closestPlaces)        
+		
 
-	    if(len(safePlaces)):
-	        return safePlaces[0]
+		closestPlaces = sorted(hidingPlaces, key=lambda p: p.distanceSq(self.pos))
 
-	    # If all hiding places are within range, then just pick the furthest
-	    return max(hidingPlaces, key=lambda p: p.distance(hunter.pos))
+		if(closest):
+			return closestPlaces[0]
+		
+		# Get the closest places that are out of range of the hunter
+		safePlaces = [place for place in closestPlaces if not hunter.canSeePosition(place)]
+
+		if(self.chosenOne and self.world.drawHidingSpots):
+			egi.blue_pen()
+			[egi.circle(p, 10) for p in safePlaces]
+
+		# If there actually are some safe places then choose the closest (they'll still be in order)
+		if(len(safePlaces)):
+			return safePlaces[0]
+
+		# If all hiding places are close to the hunter, then just pick the furthest
+		return max(hidingPlaces, key=lambda p: p.distanceSq(hunter.pos))
 
 
 
