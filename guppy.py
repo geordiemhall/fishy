@@ -101,6 +101,7 @@ class Guppy(Fish):
 
 
 		self._size = self._sizes[0]
+		self.maxCenterForce = 250
 		
 
 		
@@ -514,7 +515,7 @@ class Guppy(Fish):
 
 		# obstaclesForce = self.obstacleAvoidance(self.world.solids)
 		
-		maxCenterForce = 250
+		
 		
 		percentFromCenterX = (self.pos.x - self.world.center.x) / self.world.width
 		percentFromCenterY = (self.pos.y - self.world.center.y) / self.world.height
@@ -522,8 +523,8 @@ class Guppy(Fish):
 		
 		
 		# Square the falloff
-		valueX = -Util.sign(percentFromCenterX)*(maxCenterForce * percentFromCenterX**2)
-		valueY = -Util.sign(percentFromCenterY)*(maxCenterForce * percentFromCenterY**2)
+		valueX = -Util.sign(percentFromCenterX)*(self.maxCenterForce * percentFromCenterX**2)
+		valueY = -Util.sign(percentFromCenterY)*(self.maxCenterForce * percentFromCenterY**2)
 		
 		centerForce = Vector2D(valueX, valueY)
 		

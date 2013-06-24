@@ -75,10 +75,10 @@ class Fish(object):
 		self.maxForce = 400
 
 		# Flocking
-		self.alignmentInfluence = 25
-		self.separationInfluence = 200
+		self.alignmentInfluence = 150
+		self.separationInfluence = 20000
 		self.wanderInfluence = 2
-		self.cohesionInfluence = 11
+		self.cohesionInfluence = 2
 
 		self.neighbourDistance = 8 * scale
 		self.isNeighbour = False # Draw yourself a different colour cause you're a neighbour of the chosen one
@@ -416,7 +416,7 @@ class Fish(object):
 	def flock(self, delta):
 
 		
-		alignment = self.alignment()
+		alignment = self.alignmentForce()
 		separation = self.separationForce()
 		cohesion = self.cohesionForce()
 
@@ -435,58 +435,19 @@ class Fish(object):
 		return alignment + separation + cohesion
 
 
-	def alignment(self):
+	def alignmentForce(self):
 
-		# Clinton's version
-		avg = Vector2D() 
-		count = 0
+		steer = Vector2D()
+				
+		velocities = [agent.vel for agent in self.neighbours if self.pos.distanceSq(agent.pos) > 0.01]
+		count = len(velocities)
 
-		# velocities = [fish.vel for fish in self.neighbours if self.pos.distanceSq(fish.pos) > 0]
-		# count = len(velocities)
-		
-		# if(count):
-		# 	avg += reduce(lambda x, y: x + y, velocities)
-		
+		if(count > 0):
+			avg = sum(velocities, steer) / float(count)
+			steer = avg * self.alignmentInfluence
+			return steer.truncate(self.maxForce)
 
-		for agent in self.neighbours:
-			d = self.pos.distanceSq(agent.pos)
-			if(d > 0):
-
-				avg += agent.vel 
-				count += 1
-
-		
-		
-		if count > 0:
-			avg /= float(count) 
-
-		avg *= 150
-		
-		avg.truncate(self.maxForce)
-
-		return avg
-
-		# egi.set_pen_color(rgba('f600ff'))
-		# egi.line_by_pos(self.pos, self.pos + self.heading.normalise() * 300)
-
-		# steeringForce = self.seek(avgHeading)
-
-		# return steeringForce * self.alignmentInfluence
-
-
-		# My version
-		steeringForce = Vector2D() 
-	
-		if(len(self.neighbours) == 0):
-			return steeringForce
-
-		headings = map(lambda agent: agent.heading, self.neighbours)
-		total = reduce(lambda x, y: x + y, headings)
-		avg = total / len(self.neighbours)
-
-		steeringForce = self.seek(avg)
-
-		return steeringForce * self.alignmentInfluence
+		return steer
 
 
 
@@ -552,20 +513,16 @@ class Fish(object):
 
 	def cohesionForce(self):
 
-
-		sum = Vector2D()
-		count = 0
-
-		for agent in self.neighbours:
-			d = self.pos.distance(agent.pos)
-			if d > 0:
-				sum += agent.pos
-				count += 1
-
-		if count > 0:
-			sum = self.steer_to(sum / float(count)) * 6
+		steer = Vector2D()
 		
-		return sum # Empty vector contributes nothing
+		positions = [agent.pos for agent in self.neighbours if self.pos.distance(agent.pos) > 0.1]
+		count = len(positions)
+
+		if(count > 0):
+			avg = sum(positions, steer) / float(count)
+			return self.seek(avg) * self.cohesionInfluence
+
+		return steer
 
 
 
